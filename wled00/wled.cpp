@@ -102,6 +102,7 @@ void WLED::loop()
   #endif
   userLoop();
   UsermodManager::loop();
+  glowLoop();
   #ifdef WLED_DEBUG
   usermodMillis = millis() - usermodMillis;
   avgUsermodMillis += usermodMillis;
@@ -544,6 +545,7 @@ void WLED::setup()
   DEBUG_PRINTLN(F("Usermods setup"));
   userSetup();
   UsermodManager::setup();
+  glowSetup(); // after usermods so Glow effect IDs follow usermod effects
   DEBUG_PRINTF_P(PSTR("heap %u\n"), getFreeHeapSize());
 
   if (needsCfgSave) serializeConfigToFS(); // usermods required new parameters; need to wait for strip to be initialised #4752

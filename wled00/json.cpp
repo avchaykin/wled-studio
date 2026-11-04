@@ -499,6 +499,7 @@ bool deserializeState(JsonObject root, byte callMode, byte presetId)
   }
 
   UsermodManager::readFromJsonState(root);
+  if (root[F("glow")].is<JsonObject>()) glowDeserializeState(root[F("glow")]);
 
   loadLedmap = root[F("ledmap")] | loadLedmap;
 
@@ -894,6 +895,7 @@ void serializeInfo(JsonObject root)
   root[F("time")] = time;
 
   UsermodManager::addToJsonInfo(root);
+  glowSerializeInfo(root);
 
   uint16_t os = 0;
   #ifdef WLED_DEBUG

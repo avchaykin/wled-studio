@@ -972,7 +972,8 @@ class WS2812FX {
     uint8_t getFirstSelectedSegId() const;
     uint8_t getLastActiveSegmentId() const;
     uint8_t getActiveSegsLightCapabilities(bool selectedOnly = false) const;
-    uint8_t addEffect(uint8_t id, mode_ptr mode_fn, const char *mode_name);         // add effect to the list - mode_name must point to PROGMEM; defined in FX.cpp;
+    uint8_t addEffect(uint8_t id, mode_ptr mode_fn, const char *mode_name);
+    inline void setModeData(uint8_t id, const char *mode_name) { if (id && id < _modeData.size()) _modeData[id] = mode_name; } // replace metadata of an added effect (Glow scripts)         // add effect to the list - mode_name must point to PROGMEM; defined in FX.cpp;
 
     inline uint8_t getBrightness() const    { return _brightness16 >> 8; } // returns current strip brightness
     inline uint16_t getBrightness16() const { return _brightness16; }

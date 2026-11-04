@@ -228,6 +228,7 @@ static void handleUpload(AsyncWebServerRequest *request, const String& filename,
       request->send(200, FPSTR(CONTENT_TYPE_PLAIN), F("Config restore ok.\nRebooting..."));
     } else {
       if (filename.indexOf(F("palette")) >= 0 && filename.indexOf(F(".json")) >= 0) loadCustomPalettes();
+      if (filename.endsWith(F(".glw"))) glowRequestReload();
       request->send(200, FPSTR(CONTENT_TYPE_PLAIN), F("File Uploaded!"));
     }
     cacheInvalidate++;

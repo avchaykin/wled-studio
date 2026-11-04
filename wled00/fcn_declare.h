@@ -122,6 +122,13 @@ bool writeObjectToFile(const char* file, const char* key, const JsonDocument* co
 bool readObjectFromFileUsingId(const char* file, uint16_t id, JsonDocument* dest, const JsonDocument* filter = nullptr);
 bool readObjectFromFile(const char* file, const char* key, JsonDocument* dest, const JsonDocument* filter = nullptr);
 void updateFSInfo();
+
+//glow_fx.cpp
+void glowSetup();
+void glowLoop();
+void glowRequestReload();
+void glowSerializeInfo(JsonObject root);
+void glowDeserializeState(JsonObject g);
 size_t getFsBytesUsed();
 size_t getFsBytesTotal();
 void closeFile();
