@@ -1,0 +1,22 @@
+// Per-pixel heat buffer, cooled and diffused upward (1D fire)
+effect "Fire Bars" {
+  cooling = slider("Cooling", 80)
+  sparking = slider("Sparking", 120)
+  uses palette, default "Fire"
+  var heat = array(len)
+
+  fn frame() {
+    for i in 0..len {
+      heat[i] = max(0, heat[i] - random(cooling * 10 / len + 2))
+    }
+    for k in 0..len - 2 {
+      let i = len - 1 - k
+      heat[i] = (heat[i - 1] + heat[i - 2] * 2) / 3
+    }
+    if random(255) < sparking {
+      let y = random(7)
+      heat[y] = min(255, heat[y] + 160 + random(95))
+    }
+    for i in 0..len { set(i, pal(heat[i] * 0.94)) }
+  }
+}

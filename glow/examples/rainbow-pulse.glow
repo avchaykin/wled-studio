@@ -1,0 +1,11 @@
+// Rainbow that breathes with the music (or a slow sine without audio)
+effect "Rainbow Pulse" {
+  speed = slider("Speed", 100)
+  width = slider("Width", 128)
+
+  fn pixel(i) {
+    let hue = i * width / len + t * speed / 2000
+    let level = max(audio.vol, sin(t / 4000) * 255)
+    return hsv(hue, 255, level)
+  }
+}

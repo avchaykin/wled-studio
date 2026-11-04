@@ -1,0 +1,12 @@
+// Random sparkles over the background colour, fading out
+effect "Sparkle Field" {
+  density = slider("Density", 64)
+  decay = slider("Decay", 32)
+
+  fn frame() {
+    fade(decay)
+    for k in 0..len / 50 + 1 {
+      if random(255) < density { add(random(len), color(0)) }
+    }
+  }
+}

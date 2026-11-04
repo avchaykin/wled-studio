@@ -1,0 +1,15 @@
+// Slow drifting noise through the segment palette
+effect "Aurora" {
+  speed = slider("Speed", 128)
+  scale = slider("Scale", 64)
+  shimmer = toggle("Shimmer", false)
+  uses palette, default "Ocean"
+
+  fn pixel(i) {
+    let x = i / len
+    let n = noise(x * (scale / 8 + 1), t * speed / 200000)
+    let c = pal(n * 255)
+    if shimmer { c = c * (0.8 + 0.2 * random()) }
+    return c
+  }
+}
