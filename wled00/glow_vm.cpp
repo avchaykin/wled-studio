@@ -2,6 +2,11 @@
  * Glow VM — see glow_vm.h. Keep in step with glow/vm.mjs (reference semantics).
  */
 #include "glow_vm.h"
+
+// the interpreter loop is hot; the rest of WLED is built with -Os
+#if defined(__GNUC__) && !defined(__clang__)
+  #pragma GCC optimize("O2")
+#endif
 #include <math.h>
 #include <string.h>
 

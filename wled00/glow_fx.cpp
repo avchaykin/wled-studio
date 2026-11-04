@@ -21,6 +21,9 @@
 #ifndef GLOW_BUDGET
   #define GLOW_BUDGET 100000    // VM instructions per segment per frame
 #endif
+#ifndef GLOW_FX_BASE
+  #define GLOW_FX_BASE 230      // first effect ID used by Glow slots (stable across reboots and usermod changes)
+#endif
 #define GLOW_MAX_IMAGE 8192
 #define GLOW_NAME_LEN 32
 
@@ -111,6 +114,7 @@ static void glowRun(unsigned slotIdx) {
   }
 }
 
+static void glowReserved() { SEGMENT.fill(SEGCOLOR(0)); }
 template <unsigned N> static void glowMode() { glowRun(N); }
 template <unsigned... I> struct GlowTable { static constexpr void (*fns[])() = { &glowMode<I>... }; };
 template <unsigned... I> constexpr void (*GlowTable<I...>::fns[])();
@@ -223,7 +227,10 @@ static void glowDelete(const char *name) {
 // ---------------- public hooks (fcn_declare.h) ----------------
 void glowSetup() {
   if (!glowVM) glowVM = new glow::VM();
-  for (int i = 0; i < GLOW_SLOTS; i++) glowSlots[i].fxId = strip.addEffect(255, GlowFns::fns[i], _glow_rsvd);
+  // pad the effect list with reserved entries so Glow slots start at GLOW_FX_BASE;
+  // appending (id >= list size) avoids taking holes upstream keeps for removed effects
+  while (strip.getModeCount() < GLOW_FX_BASE) if (strip.addEffect(254, glowReserved, _glow_rsvd) == 255) break;
+  for (int i = 0; i < GLOW_SLOTS; i++) glowSlots[i].fxId = strip.addEffect(254, GlowFns::fns[i], _glow_rsvd);
   glowReloadAll();
 }
 

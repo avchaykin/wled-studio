@@ -6,7 +6,7 @@ effect "Comet" {
   var dir = 1
 
   fn frame() {
-    fade(255 - tail)
+    fade((255 - tail) / 6)
     pos += dir * speed / 256
     if pos >= len - 1 { pos = len - 1; dir = -1 }
     if pos <= 0 { pos = 0; dir = 1 }
