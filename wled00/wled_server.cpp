@@ -4,6 +4,7 @@
   #include "ota_update.h"  
 #endif
 #include "html_ui.h"
+#include "html_studio.h"
 #include "html_settings.h"
 #include "html_other.h"
 #include "js_iro.h"
@@ -625,10 +626,15 @@ void initServer()
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
     if (captivePortal(request)) return;
     if (!showWelcomePage || request->hasArg(F("sliders"))) {
-      handleStaticContent(request, F("/index.htm"), 200, FPSTR(CONTENT_TYPE_HTML), PAGE_index, PAGE_index_length);
+      handleStaticContent(request, F("/studio.htm"), 200, FPSTR(CONTENT_TYPE_HTML), PAGE_studio, PAGE_studio_length);
     } else {
       serveSettings(request);
     }
+  });
+
+  // classic WLED interface
+  server.on(F("/legacy"), HTTP_GET, [](AsyncWebServerRequest *request) {
+    handleStaticContent(request, F("/index.htm"), 200, FPSTR(CONTENT_TYPE_HTML), PAGE_index, PAGE_index_length);
   });
 
 #ifndef WLED_DISABLE_2D

@@ -8,9 +8,10 @@
     "test": "test"
   },
   "scripts": {
-    "build": "node tools/cdata.js",
+    "build": "node glow/tools/gen-natives.mjs && node studio/build.mjs --header && node tools/cdata.js",
     "test": "node --test",
-    "dev": "nodemon -e js,html,htm,css,png,jpg,gif,ico,js -w tools/ -w wled00/data/ -x node tools/cdata.js"
+    "dev": "nodemon -e js,html,htm,css,png,jpg,gif,ico,js -w tools/ -w wled00/data/ -x node tools/cdata.js",
+    "studio:dev": "python3 studio/dev.py"
   },
   "repository": {
     "type": "git",
@@ -25,10 +26,13 @@
   "dependencies": {
     "clean-css": "^5.3.3",
     "html-minifier-terser": "^7.2.0",
-    "web-resource-inliner": "^7.0.0",
-    "nodemon": "^3.1.14"
+    "nodemon": "^3.1.14",
+    "web-resource-inliner": "^7.0.0"
   },
   "engines": {
     "node": ">=20.0.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.10"
   }
 }
