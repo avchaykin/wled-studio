@@ -87,7 +87,8 @@ static bool inLocalSubnet(const IPAddress &client) {
  */
 
 static void generateEtag(char *etag, uint16_t eTagSuffix) {
-  sprintf_P(etag, PSTR("%u-%02x-%04x"), WEB_BUILD_TIME, cacheInvalidate, eTagSuffix);
+  // WEB_BUILD_TIME only changes when the classic UI is regenerated; mix in the Studio content hash too
+  sprintf_P(etag, PSTR("%u-%02x-%04x"), (unsigned)(WEB_BUILD_TIME ^ STUDIO_BUILD_HASH), cacheInvalidate, eTagSuffix);
 }
 
 static void setStaticContentCacheHeaders(AsyncWebServerResponse *response, int code, uint16_t eTagSuffix = 0) {
