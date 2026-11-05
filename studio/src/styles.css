@@ -356,3 +356,16 @@ input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px rg
 .iconbtn:hover .tip, .iconbtn:focus-visible .tip { opacity: 1; transform: none; transition-delay: .35s; }
 .iconbtn:disabled .tip { display: none; }
 @media (hover: none) { .tip { display: none; } }
+
+/* 2D matrix editor */
+.matrix-wrap { display: flex; justify-content: center; }
+.matrix-grid { position: relative; width: min(100%, 560px); max-height: 56vh; touch-action: none; user-select: none; cursor: crosshair; border-radius: 6px; overflow: hidden; background: #05060a; }
+.matrix-grid .matrix { position: absolute; inset: 0; width: 100%; height: 100%; max-height: none; margin: 0; image-rendering: pixelated; }
+.mrect { position: absolute; border-radius: 3px; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .35); cursor: pointer; }
+.mrect:hover { box-shadow: inset 0 0 0 1px rgb(255 255 255 / .7); }
+.mrect.sel { box-shadow: inset 0 0 0 2px var(--acc); }
+.mrect.off { background: rgb(14 15 17 / .7); }
+.mrect .clip-label { top: 4px; left: 4px; }
+.mrect.sel .clip-label { background: var(--acc-fill); color: #fff; }
+.mdraw { position: absolute; border: 1px dashed #fff; background: rgb(91 140 255 / .18); pointer-events: none; display: grid; place-items: center; }
+.mdraw .cursor-chip { position: static; transform: none; }

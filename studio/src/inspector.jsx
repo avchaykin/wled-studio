@@ -10,6 +10,8 @@ export function Inspector() {
   const seg = useStore(d => selSeg(d));
   const cat = useStore(d => d.cat);
   const total = useStore(d => d.info?.leds?.count ?? 0);
+  const matrix = useStore(d => d.info?.leds?.matrix);
+  const is2D = matrix?.w > 1 && matrix?.h > 1;
   const segCount = useStore(d => (d.state?.seg ?? []).filter(s => s.stop > s.start).length);
   if (!seg) return <aside class="inspector"><p class="muted pad">Connecting…</p></aside>;
   const m = fxMeta(seg.fx, cat);
@@ -25,7 +27,9 @@ export function Inspector() {
           <IconButton icon="trash" label="Delete segment" kbd="⌫" onClick={() => deleteSegment(seg)} disabled={segCount < 2} tone="danger" />
           <IconButton icon={seg.on ? 'eye' : 'eyeoff'} label={seg.on ? 'Turn segment off' : 'Turn segment on'} pressed={!seg.on} onClick={() => editSeg(seg.id, { on: !seg.on }, { now: true })} />
         </div>
-        <p class="insp-range">LEDs {seg.start}–{seg.stop - 1} · {seg.stop - seg.start} LEDs</p>
+        <p class="insp-range">{is2D
+          ? <>Columns {seg.start}–{seg.stop - 1} · rows {seg.startY ?? 0}–{(seg.stopY ?? 1) - 1} · {(seg.stop - seg.start) * ((seg.stopY ?? 1) - (seg.startY ?? 0))} LEDs</>
+          : <>LEDs {seg.start}–{seg.stop - 1} · {seg.stop - seg.start} LEDs</>}</p>
       </header>
 
       <Section title="Effect">
@@ -47,9 +51,15 @@ export function Inspector() {
       )}
 
       <Section title="Layout">
+        {is2D && (
+          <div class="fieldgrid two">
+            <Field label="Top row"><NumberField label="Top row" value={seg.startY ?? 0} max={(seg.stopY ?? 1) - 1} onChange={v => editSeg(seg.id, { startY: v }, { now: true })} wide /></Field>
+            <Field label="Bottom row (excl.)"><NumberField label="Bottom row" value={seg.stopY ?? 1} min={(seg.startY ?? 0) + 1} max={matrix.h} onChange={v => editSeg(seg.id, { stopY: v }, { now: true })} wide /></Field>
+          </div>
+        )}
         <div class="fieldgrid two">
-          <Field label="Start"><NumberField label="Start" value={seg.start} max={seg.stop - 1} onChange={v => editSeg(seg.id, { start: v }, { now: true })} wide /></Field>
-          <Field label="End"><NumberField label="End" value={seg.stop} min={seg.start + 1} max={total} onChange={v => editSeg(seg.id, { stop: v }, { now: true })} wide /></Field>
+          <Field label={is2D ? 'Left column' : 'Start'}><NumberField label="Start" value={seg.start} max={seg.stop - 1} onChange={v => editSeg(seg.id, { start: v }, { now: true })} wide /></Field>
+          <Field label={is2D ? 'Right column (excl.)' : 'End'}><NumberField label="End" value={seg.stop} min={seg.start + 1} max={is2D ? matrix.w : total} onChange={v => editSeg(seg.id, { stop: v }, { now: true })} wide /></Field>
         </div>
         <Slider label="Opacity" value={seg.bri ?? 255} onChange={v => ed({ bri: v })} fmt={v => `${Math.round(v / 2.55)}%`} />
         <div class="switches">

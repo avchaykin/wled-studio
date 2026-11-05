@@ -14,15 +14,20 @@ function snapshot() {
 }
 // run a structural change and remember how to undo it; toast=true announces it
 export function structural(label, msg, toast = true) {
-  undoStack.push({ label, segs: snapshot(), sel: getState().sel });
+  const segs = snapshot();
+  const known = new Set(segs.filter(s => s.stop > s.start).map(s => s.id));
+  // ids this change brings into existence; undo removes them even if the device hasn't echoed them yet
+  const created = (msg.seg ?? []).filter(s => !known.has(s.id) && (s.stop ?? 1) > (s.start ?? 0)).map(s => s.id);
+  undoStack.push({ label, segs, created, sel: getState().sel });
   if (undoStack.length > 30) undoStack.shift();
   command(msg);
   if (toast) set({ toast: { label, at: Date.now() } });
 }
 export function undo() {
   const u = undoStack.pop(); if (!u) return false;
-  const keep = new Set(u.segs.map(s => s.id));
-  const extra = (getState().state?.seg ?? []).filter(s => !keep.has(s.id) && s.stop > s.start).map(s => ({ id: s.id, stop: 0 }));
+  const keep = new Set(u.segs.filter(s => s.stop > s.start).map(s => s.id));
+  const drop = new Set([...u.created, ...(getState().state?.seg ?? []).filter(s => s.stop > s.start).map(s => s.id)].filter(id => !keep.has(id)));
+  const extra = [...drop].map(id => ({ id, stop: 0 }));
   command({ seg: [...extra, ...u.segs] });
   set({ sel: u.sel, toast: { label: `Undid: ${u.label.toLowerCase()}`, at: Date.now(), done: true } });
   return true;
@@ -70,6 +75,86 @@ function niceStep(n, px) {
 }
 
 export function Timeline() {
+  const matrix = useStore(d => d.info?.leds?.matrix);
+  return matrix?.w > 1 && matrix?.h > 1 ? <MatrixEditor w={matrix.w} h={matrix.h} /> : <StripTimeline />;
+}
+
+// ---------------------------------------------------------------- 2D: segments are rectangles on the matrix
+function MatrixEditor({ w, h }) {
+  const { segs, sel } = useStore(d => ({ segs: d.state?.seg, sel: d.sel }));
+  const cv = useRef(null), grid = useRef(null);
+  const [draw, setDraw] = useState(null);   // { x0, y0, x1, y1 } while dragging out a new segment
+  const [hoverCell, setHoverCell] = useState(null);
+  const rects = (segs ?? []).filter(s => s.stop > s.start && (s.stopY ?? 1) > (s.startY ?? 0));
+
+  useEffect(() => onLive(f => {
+    const c = cv.current; if (!c) return;
+    const fw = f.w || w, fh = f.h || h;
+    if (c.width !== fw || c.height !== fh) { c.width = fw; c.height = fh; }
+    const ctx = c.getContext('2d'); const img = ctx.createImageData(fw, fh);
+    for (let i = 0, j = 0; i < fw * fh && j + 2 < f.rgb.length; i++, j += 3) {
+      img.data[i * 4] = f.rgb[j]; img.data[i * 4 + 1] = f.rgb[j + 1]; img.data[i * 4 + 2] = f.rgb[j + 2]; img.data[i * 4 + 3] = 255;
+    }
+    ctx.putImageData(img, 0, 0);
+  }), [w, h]);
+
+  const cellAt = e => {
+    const r = grid.current.getBoundingClientRect();
+    return [Math.max(0, Math.min(w - 1, Math.floor((e.clientX - r.left) / r.width * w))), Math.max(0, Math.min(h - 1, Math.floor((e.clientY - r.top) / r.height * h)))];
+  };
+  const box = (x0, y0, x1, y1) => ({ left: `${x0 / w * 100}%`, top: `${y0 / h * 100}%`, width: `${(x1 - x0) / w * 100}%`, height: `${(y1 - y0) / h * 100}%` });
+
+  function startDraw(e) {
+    if (e.button !== 0 || e.target.closest('.mrect')) return;
+    e.preventDefault();
+    const [x, y] = cellAt(e);
+    let cur = { x0: x, y0: y, x1: x, y1: y };
+    setDraw(cur);
+    const move = ev => { const [cx, cy] = cellAt(ev); cur = { ...cur, x1: cx, y1: cy }; setDraw(cur); setHoverCell([cx, cy]); };
+    const up = () => {
+      removeEventListener('pointermove', move); removeEventListener('pointerup', up);
+      setDraw(null);
+      const x0 = Math.min(cur.x0, cur.x1), x1 = Math.max(cur.x0, cur.x1) + 1, y0 = Math.min(cur.y0, cur.y1), y1 = Math.max(cur.y0, cur.y1) + 1;
+      if ((x1 - x0) * (y1 - y0) < 2) return;   // a click, not a drag
+      const d = getState(); const ids = new Set(d.state.seg.filter(s => s.stop > s.start).map(s => s.id));
+      let id = 0; while (ids.has(id)) id++;
+      if (id >= (d.info?.leds?.maxseg ?? 16)) return;
+      structural(`Added segment ${id} (${x1 - x0}×${y1 - y0})`, { seg: [{ id, start: x0, stop: x1, startY: y0, stopY: y1, on: true }] });
+      set({ sel: id });
+    };
+    addEventListener('pointermove', move); addEventListener('pointerup', up);
+  }
+
+  const d = draw && { x0: Math.min(draw.x0, draw.x1), y0: Math.min(draw.y0, draw.y1), x1: Math.max(draw.x0, draw.x1) + 1, y1: Math.max(draw.y0, draw.y1) + 1 };
+  return (
+    <div class="timeline">
+      <div class="matrix-wrap">
+        <div class="matrix-grid" ref={grid} style={{ aspectRatio: `${w} / ${h}` }}
+          onPointerDown={startDraw}
+          onPointerMove={e => !draw && setHoverCell(cellAt(e))}
+          onPointerLeave={() => !draw && setHoverCell(null)}>
+          <canvas ref={cv} class="matrix" width={w} height={h} aria-label={`Live ${w}×${h} matrix`} />
+          {rects.map(s => (
+            <button key={s.id} type="button" class={`mrect${s.id === sel ? ' sel' : ''}${s.on === false ? ' off' : ''}`}
+              style={box(s.start, s.startY ?? 0, s.stop, s.stopY ?? 1)} aria-pressed={s.id === sel}
+              aria-label={`${s.n || `Segment ${s.id}`}: columns ${s.start}–${s.stop - 1}, rows ${s.startY ?? 0}–${(s.stopY ?? 1) - 1}`}
+              onClick={() => set({ sel: s.id })}>
+              <span class="clip-label">{s.n || `Seg ${s.id}`}</span>
+            </button>
+          ))}
+          {d && <div class="mdraw" style={box(d.x0, d.y0, d.x1, d.y1)}><span class="cursor-chip">{d.x1 - d.x0}×{d.y1 - d.y0}</span></div>}
+        </div>
+      </div>
+      <p class="timeline-hint">
+        <span class="hint-group">{w}×{h} matrix</span> · <span class="hint-group">drag across empty cells to add a segment</span> · <span class="hint-group">click a rectangle to select it</span>
+        {hoverCell && <span class="hint-group mono">x {hoverCell[0]}, y {hoverCell[1]}</span>}
+      </p>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------- 1D: segments are clips on one lane
+function StripTimeline() {
   const { segs, total, sel } = useStore(d => ({ segs: d.state?.seg, total: d.info?.leds?.count ?? 0, sel: d.sel }));
   const wrap = useRef(null), canvas = useRef(null);
   const [width, setWidth] = useState(0);
@@ -77,7 +162,6 @@ export function Timeline() {
   const [drag, setDrag] = useState(null);      // { owners:[{id,side}], pos }
   const frame = useRef(null);
   const row = useRef(null);
-  const matrix = useRef(null);
 
   const clips = (segs ?? []).filter(s => s.stop > s.start).map(s => {
     if (!drag) return s;
@@ -134,7 +218,6 @@ export function Timeline() {
     };
     const stop = onLive(f => {
       frame.current = f;
-      matrix.current?.(f);
       if (!raf) raf = requestAnimationFrame(draw);
     });
     draw();
@@ -184,7 +267,6 @@ export function Timeline() {
 
   return (
     <div class="timeline">
-      <MatrixPreview hook={matrix} />
       <div class="ruler" aria-hidden="true">
         {ticks.map(t => <span key={t} class="tick" style={{ left: pct(t) }}>{t}</span>)}
       </div>
@@ -234,23 +316,4 @@ export function Timeline() {
       </p>
     </div>
   );
-}
-
-// 2D devices get a grid preview above the lane.
-function MatrixPreview({ hook }) {
-  const cv = useRef(null);
-  const [dims, setDims] = useState(null);
-  useEffect(() => {
-    hook.current = f => {
-      if (!f.w || !f.h) { if (dims) setDims(null); return; }
-      if (!dims || dims.w !== f.w || dims.h !== f.h) setDims({ w: f.w, h: f.h });
-      const c = cv.current; if (!c) return;
-      if (c.width !== f.w || c.height !== f.h) { c.width = f.w; c.height = f.h; }
-      const ctx = c.getContext('2d'); const img = ctx.createImageData(f.w, f.h);
-      for (let i = 0, j = 0; i < f.w * f.h; i++, j += 3) { img.data[i * 4] = f.rgb[j]; img.data[i * 4 + 1] = f.rgb[j + 1]; img.data[i * 4 + 2] = f.rgb[j + 2]; img.data[i * 4 + 3] = 255; }
-      ctx.putImageData(img, 0, 0);
-    };
-  }, [dims]);
-  if (!dims) return null;
-  return <canvas ref={cv} class="matrix" style={{ aspectRatio: `${dims.w} / ${dims.h}` }} aria-label={`Live ${dims.w}×${dims.h} matrix`} />;
 }
