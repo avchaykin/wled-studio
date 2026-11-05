@@ -123,6 +123,9 @@ bool readObjectFromFileUsingId(const char* file, uint16_t id, JsonDocument* dest
 bool readObjectFromFile(const char* file, const char* key, JsonDocument* dest, const JsonDocument* filter = nullptr);
 void updateFSInfo();
 
+//mcp.cpp
+void registerMcpHandler(AsyncWebServer &srv);
+
 //glow_fx.cpp
 void glowSetup();
 void glowLoop();

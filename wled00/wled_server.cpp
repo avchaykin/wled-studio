@@ -478,6 +478,8 @@ void initServer()
   }, JSON_BUFFER_SIZE);
   server.addHandler(handler);
 
+  registerMcpHandler(server); // on-device MCP endpoint at /mcp
+
   server.on(F("/version"), HTTP_GET, [](AsyncWebServerRequest *request){
     request->send(200, FPSTR(CONTENT_TYPE_PLAIN), (String)VERSION);
   });

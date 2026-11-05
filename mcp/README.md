@@ -19,6 +19,16 @@ Lets an AI assistant (Claude Code, Claude Desktop, any MCP client) control WLED 
 
 Resource `glow://reference` serves the language reference plus all examples.
 
+## On-device endpoint
+
+The firmware itself also speaks MCP (Streamable HTTP, JSON responses) at `http://<device>/mcp` with four tools — `get_state`, `set_state` (WLED JSON API patch), `list_effects`, `list_palettes` — for clients that should reach the controller directly without this host server:
+
+```sh
+claude mcp add --transport http wled-device http://192.168.1.118/mcp
+```
+
+Test: `WLED_HOST=192.168.1.118 uv run --python /opt/homebrew/bin/python3 mcp/test/device_mcp.py`
+
 ## Run
 
 Needs [uv](https://docs.astral.sh/uv/) and Node.js (Node only compiles Glow scripts locally).
