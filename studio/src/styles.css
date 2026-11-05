@@ -250,6 +250,8 @@ input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px rg
 .btn.primary .kbd { background: rgb(255 255 255 / .16); border-color: rgb(255 255 255 / .25); color: #fff; }
 .btn.ghost { border-color: transparent; background: none; color: var(--tx2); }
 .btn.ghost:hover { color: var(--tx); background: var(--hover); }
+.btn.confirm-del { height: 24px; padding: 0 8px; font-size: 12px; color: var(--danger); border-color: rgb(242 85 90 / .45); background: rgb(242 85 90 / .12); }
+.btn.confirm-del:hover { background: rgb(242 85 90 / .22); }
 
 .page { padding: 20px 24px 40px; max-width: 1200px; min-width: 0; }
 .page-head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 16px; }

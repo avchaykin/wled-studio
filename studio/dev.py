@@ -48,6 +48,11 @@ class Handler(socketserver.BaseRequestHandler):
                 body, status, ctype = r.stderr, "500 Build Failed", "text/plain"
             c.sendall(f"HTTP/1.1 {status}\r\nContent-Type: {ctype}\r\nContent-Length: {len(body)}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n".encode() + body)
             return
+        if parts[0] == "GET" and path.split("?")[0] == "/studio-glow.js":
+            # written next to index.html by the build above (a page load always comes first)
+            body = open(os.path.join(ROOT, "studio", "dist", "studio-glow.js"), "rb").read()
+            c.sendall(f"HTTP/1.1 200 OK\r\nContent-Type: application/javascript\r\nContent-Length: {len(body)}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n".encode() + body)
+            return
         if MOCK2D and self.mock(c, parts[0], path, head):
             return
         # rewrite Host and force one request per connection so "/" is always ours

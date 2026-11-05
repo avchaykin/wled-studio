@@ -664,6 +664,11 @@ void initServer()
     }
   });
 
+  // Glow compiler + VM, loaded on demand by the Studio Scripts page
+  server.on(F("/studio-glow.js"), HTTP_GET, [](AsyncWebServerRequest *request) {
+    handleStaticContent(request, F("/studio-glow.js"), 200, FPSTR(CONTENT_TYPE_JAVASCRIPT), JS_studio_glow, JS_studio_glow_length);
+  });
+
   // classic WLED interface
   server.on(F("/legacy"), HTTP_GET, [](AsyncWebServerRequest *request) {
     handleStaticContent(request, F("/index.htm"), 200, FPSTR(CONTENT_TYPE_HTML), PAGE_index, PAGE_index_length);

@@ -4,8 +4,7 @@ import { useStore, getState, selSeg, command, editSeg, getJson, postJson, getTex
 import { Button, IconButton, Kbd } from './ui.jsx';
 import { Icon } from './icons.jsx';
 import { paletteStops, paletteAt } from './lib.js';
-import { compile } from '../../glow/compiler.mjs';
-import { loadImage, GlowInstance, runFrame } from '../../glow/vm.mjs';
+import { loadGlow } from './glow.js';
 import EXAMPLES from './examples.gen.js';
 
 // ---------------------------------------------------------------- Presets
@@ -61,6 +60,25 @@ const eventLabel = e => e.type === 'every' ? (e.arg >= 60000 ? `${e.arg / 60000}
   : e.type === 'button' ? `#${e.arg}` : '';
 const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 32) || 'script';
 
+// Two-step delete: the first click arms the button ("Delete?"), a second click within 3 s
+// deletes. Deleting a script on the device cannot be undone.
+function DeleteButton({ name, onDelete }) {
+  const [armed, setArmed] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!armed) return;
+    ref.current?.focus();
+    const t = setTimeout(() => setArmed(false), 3000);
+    return () => clearTimeout(t);
+  }, [armed]);
+  if (!armed) return <IconButton icon="trash" label={`Delete ${name}`} tone="danger" onClick={() => setArmed(true)} />;
+  return (
+    <button type="button" ref={ref} class="btn confirm-del" aria-label={`Confirm: delete ${name}`}
+      onClick={() => { setArmed(false); onDelete(); }} onBlur={() => setArmed(false)}
+      onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); setArmed(false); } }}>Delete?</button>
+  );
+}
+
 export function ScriptsPage() {
   const slots = useStore(d => d.info?.glow?.slots);
   const shows = useStore(d => d.info?.glow?.shows);
@@ -73,10 +91,20 @@ export function ScriptsPage() {
   const [errLine, setErrLine] = useState(null);
   const compiled = useRef(null), inst = useRef(null), t0 = useRef(0);
   const cv = useRef(null), gutter = useRef(null), ta = useRef(null);
+  const [glow, setGlow] = useState(() => window.__glow ?? null);
+
+  // the compiler + VM bundle loads on first visit to this page
+  useEffect(() => {
+    if (glow) return;
+    setStatus({ kind: 'busy', msg: 'Loading the script engine…' });
+    loadGlow().then(setGlow).catch(e => setStatus({ kind: 'error', msg: e.message }));
+  }, []);
 
   // compile on edit (debounced)
   useEffect(() => {
     try { localStorage.setItem(DRAFT, src); } catch { /* */ }
+    if (!glow) return;
+    const { compile, loadImage, GlowInstance } = glow;
     const t = setTimeout(() => {
       try {
         const c = compile(src);
@@ -94,7 +122,7 @@ export function ScriptsPage() {
       }
     }, 200);
     return () => clearTimeout(t);
-  }, [src]);
+  }, [src, glow]);
 
   // preview loop using the selected segment's length, colours and palette
   useEffect(() => {
@@ -113,7 +141,7 @@ export function ScriptsPage() {
         colors: (s?.col ?? [[255, 160, 0], [0, 0, 0], [0, 0, 0]]).map(x => (((x[3] ?? 0) << 24) | (x[0] << 16) | (x[1] << 8) | x[2]) >>> 0),
         palette: k => paletteAt(stops, k), audio: { vol: 0, bands: new Array(16).fill(0) },
       };
-      try { runFrame(i, host); } catch (e) { setStatus({ kind: 'error', msg: `Runtime: ${e.message}` }); inst.current = null; return; }
+      try { glow.runFrame(i, host); } catch (e) { setStatus({ kind: 'error', msg: `Runtime: ${e.message}` }); inst.current = null; return; }
       if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
       const ctx = canvas.getContext('2d'); const img = ctx.createImageData(w, h);
       for (let k = 0; k < w * h; k++) {
@@ -125,7 +153,7 @@ export function ScriptsPage() {
     };
     tick();
     return () => cancelAnimationFrame(raf);
-  }, []);
+  }, [glow]);
 
   const lines = src.split('\n').length;
   const save = async () => {
@@ -212,7 +240,7 @@ export function ScriptsPage() {
                   <li key={s.file} class={s.file === file ? 'current' : ''}>
                     <button type="button" class="file" onClick={() => openFile(s.file)}><span class="mono">{s.file}</span><span class="muted">#{s.fx}</span></button>
                     {s.err && <span class="tag danger" title={s.err}>Error</span>}
-                    <IconButton icon="trash" label={`Delete ${s.file}`} tone="danger" onClick={async () => { await postJson('/json/state', { glow: { del: s.file } }); setTimeout(refresh, 500); }} />
+                    <DeleteButton name={s.file} onDelete={async () => { await postJson('/json/state', { glow: { del: s.file } }); setTimeout(refresh, 500); }} />
                   </li>
                 ))}
               </ul>
@@ -226,7 +254,7 @@ export function ScriptsPage() {
                     <button type="button" class="file" onClick={() => openFile(name)}><span class="mono">{name}</span>{running === name && <span class="tag accent">Running</span>}</button>
                     <IconButton icon={running === name ? 'close' : 'play'} label={running === name ? `Stop ${name}` : `Start ${name}`}
                       onClick={async () => { await postJson('/json/state', { glow: { show: running === name ? '' : name } }); setTimeout(refresh, 500); }} />
-                    <IconButton icon="trash" label={`Delete ${name}`} tone="danger" onClick={async () => { await postJson('/json/state', { glow: { del: name } }); setTimeout(refresh, 600); }} />
+                    <DeleteButton name={name} onDelete={async () => { await postJson('/json/state', { glow: { del: name } }); setTimeout(refresh, 600); }} />
                   </li>
                 ))}
               </ul>
