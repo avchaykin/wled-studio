@@ -861,6 +861,7 @@ void serializeInfo(JsonObject root)
   root[F("clock")] = ESP.getCpuFreqMHz();
   root[F("flash")] = (ESP.getFlashChipSize()/1024)/1024;
   root[F("reset")] = (int)esp_reset_reason(); // why the last boot happened (esp_reset_reason_t: 1 power-on, 3 software, 4 panic, 5-7 watchdog, 9 brownout)
+  crashLogSerialize(root);                     // last panic's PC and backtrace, if one was recorded (crash_log.cpp)
   root[F("maxalloc")] = getContiguousFreeHeap();
   #ifdef WLED_DEBUG
   root[F("resetReason0")] = (int)rtc_get_reset_reason(0);

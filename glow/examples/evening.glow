@@ -5,7 +5,7 @@ show "Evening" {
 
   on start {
     split(2)
-    seg(0).effect("Aurora").palette("Ocean").speed(90)
+    seg(0).effect("Aurora Drift").palette("Ocean").speed(90)
     seg(1).effect("Comet").colors(#ff6000).speed(120)
   }
 

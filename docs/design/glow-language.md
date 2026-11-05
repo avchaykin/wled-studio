@@ -22,7 +22,7 @@ browser for offline preview; a shared conformance suite keeps both VMs in step.
 ### 1. Effects — draw pixels for one segment
 
 ```glow
-effect "Aurora" {
+effect "Aurora Drift" {
   // UI controls map onto WLED's sx/ix/c1..c3/o1..o3 slots and the palette
   speed  = slider("Speed", 128)
   scale  = slider("Scale", 64)
@@ -64,7 +64,7 @@ effect "Comet" {
 show "Evening" {
   on start {
     segments.split([0.5, 0.5])
-    seg(0).effect("Aurora").palette("Ocean")
+    seg(0).effect("Aurora Drift").palette("Ocean")
     seg(1).effect("Comet").colors(#ff6000)
   }
   every 30s { seg(0).palette(next) }

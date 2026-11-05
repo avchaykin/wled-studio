@@ -1,5 +1,5 @@
 // Slow drifting noise through the segment palette
-effect "Aurora" {
+effect "Aurora Drift" {
   speed = slider("Speed", 128)
   scale = slider("Scale", 64)
   shimmer = toggle("Shimmer", false)

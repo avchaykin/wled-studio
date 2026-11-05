@@ -50,6 +50,8 @@ effect "Ocean Drift" {
 - `var` at the top of an effect keeps state between frames (`var heat = array(len)`); `let` is local. No recursion; loops are `for i in 0..n` and `while`.
 - Audio: `audio.vol`, `audio.beat`, `audio.band(0..15)`.
 
+Give each script a name no built-in effect uses (`wled_effects(query=...)` to check): name lookups in Home Assistant and shows pick the built-in effect first, and `glow_install` warns about a clash.
+
 Workflow: draft → `glow_check(source)` → fix the reported `line:col` error → `glow_install(file_name, source, run_on_segment=N)` → `wled_snapshot` to confirm it lights up. Keep per-pixel work modest: around 10 `noise()` calls per LED on 250 LEDs already halves the frame rate, and scripts that exceed the per-frame budget stop and show a dim red pattern (`glow_scripts` reports the error).
 
 ### Shows (event scripts)
@@ -59,7 +61,7 @@ A show orchestrates the device over time instead of drawing pixels. One show run
 ```glow
 show "Evening" {
   var step = 0
-  on start { split(2)  seg(0).effect("Aurora").palette("Ocean")  seg(1).effect("Comet").colors(#ff6000) }
+  on start { split(2)  seg(0).effect("Aurora Drift").palette("Ocean")  seg(1).effect("Comet").colors(#ff6000) }
   every 20s { step += 1  seg(0).palette(step % 2 == 0 ? "Ocean" : "Forest") }
   at "23:00" { brightness(10, 10m) }      // value, fade time
   on button(0) { preset(next) }

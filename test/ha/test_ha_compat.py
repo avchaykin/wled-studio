@@ -51,7 +51,14 @@ async def main() -> int:
             check("info: mac address present", bool(info.mac_address), info.mac_address)
             check("effects list parses", len(dev.effects) > 100, f"{len(dev.effects)} effects")
             names = {e.name for e in dev.effects.values()} if isinstance(dev.effects, dict) else {e.name for e in dev.effects}
-            check("Glow script effects are listed by name", {"Aurora", "Comet", "Fire Bars"} <= names)
+            # use whatever Glow scripts are installed (needs at least one) and the first existing segment
+            slots = raw("/json/info")["glow"]["slots"]
+            eff_names = raw("/json/eff")
+            glow_names = {eff_names[s["fx"]] for s in slots}
+            check("Glow script effects are listed by name", bool(slots) and glow_names <= names, f"{sorted(glow_names)}")
+            glow_slot = slots[0] if slots else {"fx": -1}
+            glow_name = eff_names[glow_slot["fx"]] if slots else "?"
+            sid = raw("/json/state")["seg"][0]["id"]
             check("palettes list parses", len(dev.palettes) > 50, f"{len(dev.palettes)} palettes")
             check("presets parse", isinstance(dev.presets, dict), f"{len(dev.presets)} presets")
             segs = dev.state.segments
@@ -63,12 +70,11 @@ async def main() -> int:
             check("master on + brightness", st["on"] and st["bri"] == 60, f"bri={st['bri']}")
 
             # segment control by effect *name*, including a Glow script effect
-            await led.segment(0, effect="Comet", speed=90, intensity=200)
+            await led.segment(sid, effect=glow_name, speed=90, intensity=200)
             seg0 = raw("/json/state")["seg"][0]
-            glow_fx = {s["file"]: s["fx"] for s in raw("/json/info")["glow"]["slots"]}
-            check("select Glow effect by name", seg0["fx"] == glow_fx.get("comet"), f"fx={seg0['fx']}")
+            check(f"select Glow effect by name ({glow_name})", seg0["fx"] == glow_slot["fx"], f"fx={seg0['fx']}")
             check("speed/intensity applied", seg0["sx"] == 90 and seg0["ix"] == 200)
-            await led.segment(0, effect="Rainbow", palette="Ocean", color_primary=(255, 80, 0))
+            await led.segment(sid, effect="Rainbow", palette="Ocean", color_primary=(255, 80, 0))
             seg0 = raw("/json/state")["seg"][0]
             check("built-in effect + palette + colour", seg0["col"][0][:3] == [255, 80, 0], f"fx={seg0['fx']} pal={seg0['pal']}")
 

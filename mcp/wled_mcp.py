@@ -481,8 +481,13 @@ def glow_install(file_name: str, source: str, run_on_segment: int | None = None,
     _catalogue.pop(host, None)
     if run_on_segment is not None:
         _state(host, {"seg": [{"id": run_on_segment, "fx": slot["fx"], "fxdef": True}]})
-    return {"installed": file_name, "effect_name": res["name"], "effect_id": slot["fx"], "bytes": res["size"],
-            "controls": [c["label"] for c in res["controls"]], "running_on": run_on_segment, "error": slot.get("err")}
+    out = {"installed": file_name, "effect_name": res["name"], "effect_id": slot["fx"], "bytes": res["size"],
+           "controls": [c["label"] for c in res["controls"]], "running_on": run_on_segment, "error": slot.get("err")}
+    # name lookups (Home Assistant, shows, this server) take the first match, i.e. the built-in effect
+    if any(i != slot["fx"] and n.lower() == res["name"].lower() for i, n in enumerate(_http(host, "/json/eff"))):
+        out["warning"] = (f'A built-in effect is also named "{res["name"]}", so selecting it by name picks the built-in one. '
+                          "Rename the effect in the script and install it again.")
+    return out
 
 
 @mcp.tool()

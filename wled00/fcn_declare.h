@@ -134,6 +134,7 @@ void glowSerializeInfo(JsonObject root);
 void glowDeserializeState(JsonObject g);
 void glowSerializeState(JsonObject root);
 bool glowButton(uint8_t b);
+void crashLogSerialize(JsonObject root);
 size_t getFsBytesUsed();
 size_t getFsBytesTotal();
 void closeFile();
