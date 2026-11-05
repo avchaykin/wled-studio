@@ -73,7 +73,10 @@ test('C++ VM matches the JS reference VM', { skip: !haveCxx && 'no C++ compiler'
 
   const cases = [];
   const ex = join(here, '..', 'examples');
-  for (const f of readdirSync(ex).filter(f => f.endsWith('.glow'))) cases.push([f, readFileSync(join(ex, f), 'utf8')]);
+  for (const f of readdirSync(ex).filter(f => f.endsWith('.glow'))) {
+    const src = readFileSync(join(ex, f), 'utf8');
+    if (compile(src).kind === 'effect') cases.push([f, src]);   // shows have no pixels to compare
+  }
   for (const [k, v] of Object.entries(SNIPPETS)) cases.push([k, v]);
 
   for (const [name, src] of cases) {

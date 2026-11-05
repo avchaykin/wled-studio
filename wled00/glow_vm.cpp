@@ -25,15 +25,17 @@ const char *Image::load(const uint8_t *data, size_t len) {
   if (data[4] != 1) return "unsupported image version";
   bytes = data; size = len;
   kind = data[5]; flags = data[6]; nGlobals = data[7]; nConsts = data[8]; nStrings = data[9];
-  nFuncs = data[10]; nControls = data[11]; initFn = data[12]; mainFn = data[13];
+  nFuncs = data[10]; nControls = data[11]; initFn = data[12]; mainFn = data[13]; nEvents = data[14];
   codeLen = rd16(data + 16); metaLen = rd16(data + 18);
   if (nGlobals > 64) return "too many globals";
   size_t p = 20;
   consts = data + p; p += (size_t)nConsts * 5;
   if (p > len) return "truncated constants";
+  strings = data + p;
   for (uint8_t i = 0; i < nStrings; i++) { if (p >= len || p + 1 + data[p] > len) return "truncated strings"; p += 1 + data[p]; }
   funcs = data + p; p += (size_t)nFuncs * 4;
   meta = (const char *)(data + p); p += metaLen;
+  events = data + p; p += (size_t)nEvents * 6;
   code = data + p; p += codeLen;
   if (p != len) return "image size mismatch";
   if (codeLen == 0) return "no code";
@@ -45,6 +47,13 @@ const char *Image::load(const uint8_t *data, size_t len) {
   if (initFn != 255 && initFn >= nFuncs) return "bad init function";
   if (mainFn != 255 && mainFn >= nFuncs) return "bad main function";
   if (kind == K_EFFECT && mainFn == 255) return "effect has no main function";
+  if (kind == K_EFFECT && nEvents) return "effects have no event handlers";
+  if (kind == K_SHOW && !nEvents) return "show has no handlers";
+  if (kind > K_SHOW) return "unknown script kind";
+  for (uint8_t i = 0; i < nEvents; i++) {
+    Event e = event(i);
+    if (e.type > EV_BEAT || e.fn >= nFuncs || func(e.fn).nargs != 0) return "bad event table";
+  }
   if (initFn != 255 && func(initFn).nargs != 0) return "init function takes arguments";
   if (mainFn != 255) {
     uint8_t want = (flags & F_PIXEL) ? ((flags & F_2D) ? 2 : 1) : 0;
@@ -149,6 +158,19 @@ const char *Image::verify() {
 done:
   free(start); free(depth); free(work);
   return err;
+}
+
+Event Image::event(uint8_t i) const {
+  const uint8_t *e = events + i * 6;
+  return Event{ e[0], e[1], rd32(e + 2) };
+}
+
+int Image::str(uint8_t i, const char **out) const {
+  if (i >= nStrings) return -1;
+  const uint8_t *p = strings;
+  for (uint8_t k = 0; k < i; k++) p += 1 + p[0];
+  *out = (const char *)(p + 1);
+  return p[0];
 }
 
 Func Image::func(uint8_t i) const {
@@ -320,7 +342,16 @@ bool VM::measureArena(const Image &img, Host &host, uint32_t &arenaBytes) {
   return ok;
 }
 
-bool VM::runFrame(const Image &img, Host &host, uint8_t *state, size_t stateSize, uint32_t seed, uint32_t budget) {
+bool VM::runEvent(const Image &img, Host &host, uint8_t fn, uint8_t *state, size_t stateSize, uint32_t seed, uint32_t budget) {
+  if (!prepare(img, host, state, stateSize, seed, budget)) return false;
+  if (fn >= img.nFuncs || img.func(fn).nargs != 0) return fail(E_BAD_CODE, "bad handler");
+  Value r;
+  if (!exec(fn, nullptr, 0, r)) { st_->error = lastError; return false; }
+  return true;
+}
+
+// common setup for runFrame/runEvent: bind state memory, run init once
+bool VM::prepare(const Image &img, Host &host, uint8_t *state, size_t stateSize, uint32_t seed, uint32_t budget) {
   size_t base = stateBaseSize(img);
   if (stateSize < base) return fail(E_MEMORY);
   img_ = &img; host_ = &host;
@@ -339,7 +370,12 @@ bool VM::runFrame(const Image &img, Host &host, uint8_t *state, size_t stateSize
     if (img.initFn != 255) { Value r; if (!exec(img.initFn, nullptr, 0, r)) { st_->error = lastError; return false; } }
     st_->inited = 1;
   }
+  return true;
+}
 
+bool VM::runFrame(const Image &img, Host &host, uint8_t *state, size_t stateSize, uint32_t seed, uint32_t budget) {
+  if (img.kind != K_EFFECT || img.mainFn == 255) return fail(E_BAD_CODE, "not an effect");
+  if (!prepare(img, host, state, stateSize, seed, budget)) return false;
   bool ok = true;
   if (img.flags & Image::F_PIXEL) {
     pixelMode_ = true;
@@ -673,7 +709,13 @@ bool VM::native(uint8_t id, Value *a, uint8_t argc, Value &out) {
       float k = NUM(0); CHECK(); int i = toIndex(k);
       RET_NUM(i >= 0 && i < 16 && h.audioBands ? h.audioBands[i] : 0.0f);
     }
-    default: return fail(E_BAD_CODE, "native not implemented");
+    default:
+      if (NATIVE_SHOW[id]) {
+        if (img_->kind != K_SHOW) return fail(E_BAD_CODE, "show function in an effect");
+        if (!h.show(id, a, argc, *img_, out)) return fail(E_TYPE, "bad argument to a show function");
+        return true;
+      }
+      return fail(E_BAD_CODE, "native not implemented");
   }
   #undef NUM
   #undef COL

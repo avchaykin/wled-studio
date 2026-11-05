@@ -1,7 +1,7 @@
 // Glow compiler: source -> bytecode image (Uint8Array) + metadata
 import { parse } from './parser.mjs';
 import { GlowError } from './lexer.mjs';
-import { OP, NATIVES, NATIVE_ID, BUILTIN_ID, KIND, TAG, CONTROL } from './natives.mjs';
+import { OP, NATIVES, NATIVE_ID, BUILTIN_ID, KIND, TAG, CONTROL, EVENT } from './natives.mjs';
 
 export { GlowError };
 
@@ -10,6 +10,9 @@ const TOGGLE_SLOTS = ['o1', 'o2', 'o3'];
 const AUDIO_VARS = { vol: 'audio_vol', peak: 'audio_peak', beat: 'audio_beat', freq: 'audio_freq' };
 const AUDIO_FNS = { band: 'audio_band' };
 const DRAW_NATIVES = new Set(NATIVES.filter(n => n[3] === 'frame').map(n => n[0]));
+// segment handle methods in shows: seg(0).effect("Aurora") -> seg_effect(seg(0), "Aurora")
+const SEG_METHODS = { effect: 'seg_effect', palette: 'seg_palette', colors: 'seg_colors', speed: 'seg_speed', intensity: 'seg_intensity', bri: 'seg_bri', on: 'seg_on' };
+const EVENT_NAMES = { start: EVENT.START, stop: EVENT.STOP, button: EVENT.BUTTON, beat: EVENT.BEAT };
 const MAX_LOCALS = 64;
 
 const f32 = new Float32Array(1);
@@ -64,6 +67,7 @@ class Compiler {
     this.usesPalette = false; this.usesAudio = false;
     this.colorsUsed = new Set();
     this.paletteDefault = null;
+    this.handlers = []; this.events = [];
   }
 
   err(msg, n) { return new GlowError(msg, n?.line, n?.col); }
@@ -102,6 +106,8 @@ class Compiler {
         if (this.globals.size >= 64) throw this.err('too many vars (max 64)', m);
         this.globals.set(m.name, this.globals.size);
         varInits.push(m);
+      } else if (m.type === 'on' || m.type === 'every' || m.type === 'at') {
+        this.handlers.push(m);
       } else if (m.type === 'fn') {
         if (dupe()) throw this.err(`'${m.name}' is already declared`, m);
         if (NATIVE_ID[m.name] !== undefined) throw this.err(`'${m.name}' is a built-in function name`, m);
@@ -125,8 +131,34 @@ class Compiler {
       }
     }
 
-    // pass 2: compile functions (declared order), then the init function
+    // pass 2: compile functions (declared order), show handlers, then the init function
     for (const [name, d] of this.fnDecls) this.fns[d.index] = this.compileFn(name, d.node);
+    if (this.kind === KIND.SHOW) {
+      if (!this.handlers.length) throw this.err('a show needs at least one handler: on start { }, every 10s { }, at "22:00" { }, on button(0) { }', ast);
+      for (const h of this.handlers) {
+        let type, arg = 0, label;
+        if (h.type === 'every') {
+          const iv = this.constEval(h.interval);
+          if (iv.tag !== TAG.NUM || !(iv.value >= 50)) throw this.err('every needs a constant interval of at least 50ms, e.g. every 30s', h);
+          type = EVENT.EVERY; arg = Math.round(iv.value); label = `every ${arg}ms`;
+        } else if (h.type === 'at') {
+          const m = /^(\d{1,2}):(\d{2})$/.exec(h.time);
+          if (!m || +m[1] > 23 || +m[2] > 59) throw this.err(`at needs a time like "07:30", got "${h.time}"`, h);
+          type = EVENT.AT; arg = +m[1] * 60 + +m[2]; label = `at ${h.time}`;
+        } else {
+          type = EVENT_NAMES[h.event];
+          if (type === undefined) throw this.err(`unknown event 'on ${h.event}'. Events: start, stop, button(n), beat`, h);
+          if (type === EVENT.BUTTON) {
+            if (h.args.length !== 1) throw this.err('on button(n) needs the button number', h);
+            arg = this.constEval(h.args[0]).value | 0;
+          } else if (h.args.length) throw this.err(`on ${h.event} takes no arguments`, h);
+          label = `on ${h.event}`;
+        }
+        const fb = this.compileFn(`<${label}>`, { params: [], body: h.body, line: h.line, col: h.col });
+        this.events.push({ type, fn: this.fns.length, arg });
+        this.fns.push(fb);
+      }
+    }
     let initFn = 255;
     if (varInits.length) {
       const fb = new FnBuilder('__init', [], this.ast);
@@ -141,7 +173,7 @@ class Compiler {
     if (this.usesPalette) flags |= 8;
     if (this.usesAudio) flags |= 16;
 
-    const meta = this.modeData(flags);
+    const meta = this.kind === KIND.EFFECT ? this.modeData(flags) : this.ast.name;
     const image = this.link({ flags, mainFn, initFn, meta });
     return {
       image, meta,
@@ -149,6 +181,7 @@ class Compiler {
       controls: [...this.controls].map(([name, c]) => ({ name, ...c, ctl: c.ctl === CONTROL.SLIDER ? 'slider' : 'toggle' })),
       paletteDefault: this.paletteDefault,
       twoD: !!(flags & 2), audio: this.usesAudio,
+      events: this.events.map(e => ({ ...e, type: Object.keys(EVENT).find(k => EVENT[k] === e.type).toLowerCase() })),
     };
   }
 
@@ -335,7 +368,13 @@ class Compiler {
       case 'num': return this.pushConst({ tag: TAG.NUM, value: Math.fround(n.value) });
       case 'color': return this.pushConst({ tag: TAG.COLOR, value: n.value });
       case 'bool': return fb.emit(n.value ? OP.PUSHT : OP.PUSHF);
-      case 'str': throw this.err('strings are only allowed as names in show scripts', n);
+      case 'str': {
+        if (this.kind !== KIND.SHOW) throw this.err('strings are only allowed as names in show scripts', n);
+        let k = this.strings.indexOf(n.value);
+        if (k < 0) { if (this.strings.length >= 255) throw this.err('too many strings', n); this.strings.push(n.value); k = this.strings.length - 1; }
+        if (new TextEncoder().encode(n.value).length > 255) throw this.err('string too long', n);
+        fb.emit(OP.PUSHS, k); return;
+      }
       case 'ident': return this.ident(n);
       case 'unary':
         this.expr(n.arg); fb.emit(n.op === '-' ? OP.NEG : OP.NOT); return;
@@ -402,13 +441,24 @@ class Compiler {
     if (name === 'speed') return fb.emit(OP.LOADC, 0);
     if (name === 'intensity') return fb.emit(OP.LOADC, 1);
     if (name === 'PI') return this.pushConst({ tag: TAG.NUM, value: Math.fround(Math.PI) });
+    if (name === 'next' && this.kind === KIND.SHOW) return fb.emit(OP.PUSHI, 0xff); // -1: next effect/palette/preset
     throw this.err(`unknown name '${name}'`, n);
   }
 
   call(n) {
     const fb = this.cur;
-    if (Object.keys(n.named).length) throw this.err('named arguments are only supported in show scripts', n);
+    if (Object.keys(n.named).length) throw this.err('named arguments are not supported; pass values in order', n);
     let name;
+    if (n.callee.type === 'member' && SEG_METHODS[n.callee.prop] && !(n.callee.obj.type === 'ident' && n.callee.obj.name === 'audio')) {
+      if (this.kind !== KIND.SHOW) throw this.err(`.${n.callee.prop}() on segments is only available in show scripts`, n);
+      const native = SEG_METHODS[n.callee.prop];
+      const [, min, max] = NATIVES[NATIVE_ID[native]];
+      if (n.args.length < min - 1 || n.args.length > max - 1) throw this.err(`.${n.callee.prop}() takes ${min - 1 === max - 1 ? min - 1 : `${min - 1}-${max - 1}`} argument(s)`, n);
+      this.expr(n.callee.obj);
+      n.args.forEach(a => this.expr(a));
+      fb.emit(OP.NATIVE, NATIVE_ID[native], n.args.length + 1);
+      return;
+    }
     if (n.callee.type === 'ident') name = n.callee.name;
     else if (n.callee.type === 'member' && n.callee.obj.type === 'ident' && n.callee.obj.name === 'audio' && AUDIO_FNS[n.callee.prop]) {
       name = AUDIO_FNS[n.callee.prop]; this.usesAudio = true;
@@ -433,6 +483,8 @@ class Compiler {
     if (n.args.length < min || n.args.length > max)
       throw this.err(`${name}() takes ${min === max ? min : `${min}-${max}`} argument(s), got ${n.args.length}`, n);
     if (ctx === 'frame' && this.fnName === 'pixel') throw this.err(`${name}() draws pixels — use it in fn frame(), not in fn pixel()`, n);
+    if (ctx === 'frame' && this.kind === KIND.SHOW) throw this.err(`${name}() draws pixels — shows change segments, effects and presets; draw in an effect script`, n);
+    if (ctx === 'show' && this.kind !== KIND.SHOW) throw this.err(`${name}() is only available in show scripts`, n);
     if (name === 'array' && !this.inInit) throw this.err('array() is only allowed as a var initializer: var buf = array(len)', n);
     if (name === 'pal') this.usesPalette = true;
     if (name === 'color') {
@@ -461,12 +513,14 @@ class Compiler {
     [0x47, 0x4c, 0x57, 0x31].forEach(u8);            // "GLW1"
     u8(1); u8(this.kind); u8(flags); u8(this.globals.size);
     u8(this.consts.length); u8(this.strings.length); u8(this.fns.length); u8(this.controls.size);
-    u8(initFn); u8(mainFn); u8(0); u8(0);
+    if (this.events.length > 64) throw this.err('too many handlers (max 64)');
+    u8(initFn); u8(mainFn); u8(this.events.length); u8(0);
     u16(code.length); u16(metaBytes.length);
     for (const c of this.consts) { u8(c.tag); u32le(c.bits); }
     for (const s of this.strings) { const b = new TextEncoder().encode(s); u8(b.length); b.forEach(u8); }
     this.fns.forEach((f, i) => { u16(offsets[i]); u8(f.params.length); u8(f.nlocals); });
     metaBytes.forEach(u8);
+    for (const e of this.events) { u8(e.type); u8(e.fn); u32le(e.arg >>> 0); }
     code.forEach(u8);
     return Uint8Array.from(out);
   }

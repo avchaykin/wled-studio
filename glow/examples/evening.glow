@@ -1,0 +1,20 @@
+// Evening scene: two zones, palette drifts every 20 s, winds down at 23:00.
+// Button 0 steps through presets; on a beat (with a microphone) zone 2 flashes.
+show "Evening" {
+  var step = 0
+
+  on start {
+    split(2)
+    seg(0).effect("Aurora").palette("Ocean").speed(90)
+    seg(1).effect("Comet").colors(#ff6000).speed(120)
+  }
+
+  every 20s {
+    step += 1
+    seg(0).palette(step % 2 == 0 ? "Ocean" : "Forest")
+  }
+
+  at "23:00" { brightness(10, 10m) }
+  on button(0) { preset(next) }
+  on beat { seg(1).bri(255) }
+}

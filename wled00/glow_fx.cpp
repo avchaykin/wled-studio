@@ -6,9 +6,13 @@
  * Compiled images live in /glow/<name>.glw (source in /glow/<name>.glow);
  * /glow/slots.json maps slot index -> script name.
  *
+ * Show scripts (kind show) are not effects: one can run at a time, driven by events
+ * (start/stop, every, at, button, beat) from glowLoop().
+ *
  * JSON API:
- *   info.glow  -> { slots: [{ id, fx, name, file, size, err }], budget }
- *   state.glow <- { reload: true } | { del: "name" }
+ *   info.glow  -> { slots: [{ id, fx, file, size, err }], shows: [names], budget }
+ *   state.glow <- { reload: true } | { del: "name" } | { show: "name" | "" }
+ *   state.glow -> { show: "name" } while a show runs (so presets can start shows)
  */
 #include "wled.h"
 
@@ -173,8 +177,232 @@ static void glowSaveSlots() {
   if (f) { serializeJson(doc, f); f.close(); }
 }
 
+// ---------------- shows ----------------
+#define GLOW_MAX_SHOWS 16
+static char glowShowNames[GLOW_MAX_SHOWS][GLOW_NAME_LEN + 1];
+static uint8_t glowShowCount = 0;
+
+static int glowFileKind(const char *name) {
+  char path[64];
+  snprintf_P(path, sizeof(path), PSTR("%s/%s.glw"), _glow_dir, name);
+  File f = WLED_FS.open(path, "r");
+  if (!f) return -1;
+  uint8_t hdr[6] = {};
+  f.read(hdr, sizeof(hdr)); f.close();
+  return hdr[0] == 'G' && hdr[1] == 'L' && hdr[2] == 'W' ? hdr[5] : -1;
+}
+static void glowAddShowName(const char *n) {
+  if (glowShowCount < GLOW_MAX_SHOWS) strlcpy(glowShowNames[glowShowCount++], n, GLOW_NAME_LEN + 1);
+}
+
+struct GlowShow {
+  uint8_t *bytes = nullptr; size_t size = 0;
+  glow::Image img;
+  uint8_t *state = nullptr; size_t stateSize = 0;
+  char file[GLOW_NAME_LEN + 1] = "";
+  uint32_t next[64];          // next due time per EVERY event
+  uint16_t lastMinute = 0xffff;
+  bool lastPeak = false;
+  uint8_t lastError = 0;
+};
+static GlowShow glowShow;
+static char glowShowPending[GLOW_NAME_LEN + 1] = "";
+static bool glowShowStopPending = false;
+
+// case-insensitive name match: exact first, then prefix
+static int glowFindName(const char *want, int wlen, int count, void (*nameAt)(int, char *, size_t)) {
+  char buf[48];
+  for (int pass = 0; pass < 2; pass++)
+    for (int i = 0; i < count; i++) {
+      nameAt(i, buf, sizeof(buf));
+      int l = strlen(buf);
+      if (!l || !strcmp_P(buf, PSTR("RSVD"))) continue;
+      if ((pass == 0 ? l == wlen : l >= wlen) && !strncasecmp(buf, want, wlen)) return i;
+    }
+  return -1;
+}
+static void glowEffectName(int i, char *buf, size_t n) {
+  strncpy_P(buf, strip.getModeData(i), n - 1); buf[n - 1] = 0;
+  char *at = strchr(buf, '@'); if (at) *at = 0;
+}
+static int glowPaletteCount = 0;
+static void glowPaletteName(int i, char *buf, size_t n) {
+  // walk the PROGMEM JSON array of palette names: ["Default","* Random Cycle",...]
+  const char *p = JSON_palette_names; int idx = -1; buf[0] = 0;
+  for (char c; (c = pgm_read_byte(p)); p++) {
+    if (c != '"') continue;
+    idx++;
+    size_t k = 0;
+    for (p++; (c = pgm_read_byte(p)) && c != '"'; p++) if (idx == i && k < n - 1) buf[k++] = c;
+    if (idx == i) { buf[k] = 0; return; }
+    if (!c) break;
+  }
+}
+static int glowCountPalettes() {
+  if (!glowPaletteCount) { char b[48]; for (int i = 0; i < 255; i++) { glowPaletteName(i, b, sizeof(b)); if (!b[0]) { glowPaletteCount = i; break; } } }
+  return glowPaletteCount;
+}
+
+static void glowApply(JsonDocument &doc) { deserializeState(doc.as<JsonObject>(), CALL_MODE_DIRECT_CHANGE); }
+
+class ShowHost : public glow::Host {
+public:
+  uint32_t getPixel(int) override { return 0; }
+  void setPixel(int, uint32_t) override {}
+  uint32_t palette(uint8_t) override { return 0; }  // no segment context in shows
+  bool show(uint8_t id, const glow::Value *a, uint8_t argc, const glow::Image &img, glow::Value &out) override {
+    using namespace glow;
+    auto isNum = [&](int k) { return a[k].tag == T_NUM || a[k].tag == T_BOOL; };
+    auto num = [&](int k) { return isNum(k) ? a[k].f : 0.0f; };
+    auto clampi = [](float v, int lo, int hi) { return !(v >= lo) ? lo : v > hi ? hi : (int)v; };
+    out.tag = T_NUM; out.f = 0;
+    StaticJsonDocument<1024> doc;
+    int segId = argc ? clampi(num(0), 0, strip.getMaxSegments() - 1) : 0;
+    auto seg = [&]() { JsonObject s = doc.createNestedArray("seg").createNestedObject(); s["id"] = segId; out.f = segId; return s; };
+    // name-or-number argument: string -> lookup, -1 -> "~" (next), number -> id
+    auto pick = [&](JsonObject s, const char *key, int count, void (*nameAt)(int, char *, size_t)) -> bool {
+      if (a[1].tag == T_STR) {
+        const char *str; int l = img.str((uint8_t)a[1].u, &str);
+        int idx = l > 0 ? glowFindName(str, l, count, nameAt) : -1;
+        if (idx < 0) return true;                // unknown name: ignore (shows keep running)
+        s[key] = idx; return true;
+      }
+      if (!isNum(1)) return false;
+      if (num(1) < 0) s[key] = "~"; else s[key] = clampi(num(1), 0, 255);
+      return true;
+    };
+    switch (id) {
+      case N_SEG: out.f = segId; return true;
+      case N_SEG_EFFECT: { JsonObject s = seg(); if (!pick(s, "fx", strip.getModeCount(), glowEffectName)) return false; break; }
+      case N_SEG_PALETTE: { JsonObject s = seg(); if (!pick(s, "pal", glowCountPalettes(), glowPaletteName)) return false; break; }
+      case N_SEG_COLORS: {
+        JsonObject s = seg(); JsonArray col = s.createNestedArray("col");
+        for (int k = 1; k < argc; k++) {
+          if (a[k].tag != T_COLOR) return false;
+          uint32_t c = a[k].u; JsonArray e = col.createNestedArray();
+          e.add((c >> 16) & 255); e.add((c >> 8) & 255); e.add(c & 255); e.add((c >> 24) & 255);
+        }
+        break;
+      }
+      case N_SEG_SPEED: if (!isNum(1)) return false; seg()["sx"] = clampi(num(1), 0, 255); break;
+      case N_SEG_INTENSITY: if (!isNum(1)) return false; seg()["ix"] = clampi(num(1), 0, 255); break;
+      case N_SEG_BRI: if (!isNum(1)) return false; seg()["bri"] = clampi(num(1), 0, 255); break;
+      case N_SEG_ON: if (!isNum(1)) return false; seg()["on"] = num(1) != 0; break;
+      case N_SPLIT: {
+        int n = clampi(num(0), 1, strip.getMaxSegments());
+        int total = strip.getLengthTotal();
+        if (n > total) n = total;
+        JsonArray segs = doc.createNestedArray("seg");
+        for (int k = 0; k < n; k++) { JsonObject s = segs.createNestedObject(); s["id"] = k; s["start"] = total * k / n; s["stop"] = total * (k + 1) / n; s["on"] = true; }
+        for (int k = n; k < strip.getMaxSegments(); k++) { JsonObject s = segs.createNestedObject(); s["id"] = k; s["stop"] = 0; }
+        out.f = n;
+        break;
+      }
+      case N_PRESET: {
+        if (a[0].tag == T_STR) {
+          const char *str; int l = img.str((uint8_t)a[0].u, &str);
+          String nm;
+          for (int p = 1; p < 251 && l > 0; p++) if (getPresetName(p, nm) && (int)nm.length() == l && !strncasecmp(nm.c_str(), str, l)) { doc["ps"] = p; break; }
+          if (!doc.containsKey("ps")) return true;  // unknown preset: ignore
+        } else if (num(0) < 0) doc["ps"] = "1~250~";  // next preset
+        else doc["ps"] = clampi(num(0), 1, 250);
+        break;
+      }
+      case N_POWER: doc["on"] = num(0) != 0; break;
+      case N_BRIGHTNESS: {
+        doc["bri"] = clampi(num(0), 0, 255);
+        if (argc > 1) doc["tt"] = clampi(num(1) / 100, 0, 65535);
+        break;
+      }
+      case N_HOUR: out.f = hour(localTime); return true;
+      case N_MINUTE: out.f = minute(localTime); return true;
+      case N_SEGCOUNT: out.f = strip.getActiveSegmentsNum(); return true;
+      default: return false;
+    }
+    glowApply(doc);
+    return true;
+  }
+};
+
+static void glowShowRun(uint8_t type, uint32_t arg, bool matchArg) {
+  GlowShow &s = glowShow;
+  if (!s.bytes || !glowVM) return;
+  ShowHost host;
+  for (uint8_t i = 0; i < s.img.nEvents; i++) {
+    glow::Event e = s.img.event(i);
+    if (e.type != type || (matchArg && e.arg != arg)) continue;
+    if (!glowVM->runEvent(s.img, host, e.fn, s.state, s.stateSize, hw_random() | 1, GLOW_BUDGET)) {
+      s.lastError = glowVM->lastError;
+      DEBUG_PRINTF_P(PSTR("Glow show %s: %s\n"), s.file, glow::errorText(s.lastError));
+    }
+  }
+}
+
+static void glowShowStop() {
+  GlowShow &s = glowShow;
+  if (!s.bytes) return;
+  glowShowRun(glow::EV_STOP, 0, false);
+  free(s.bytes); free(s.state);
+  s = GlowShow();
+  stateChanged = true;
+}
+
+static bool glowShowStart(const char *name) {
+  glowShowStop();
+  if (!validName(name) || glowFileKind(name) != glow::K_SHOW || !glowVM) return false;
+  char path[64];
+  snprintf_P(path, sizeof(path), PSTR("%s/%s.glw"), _glow_dir, name);
+  File f = WLED_FS.open(path, "r");
+  if (!f) return false;
+  size_t sz = f.size();
+  if (sz < 20 || sz > GLOW_MAX_IMAGE) { f.close(); return false; }
+  uint8_t *buf = (uint8_t *)malloc(sz);
+  if (!buf) { f.close(); return false; }
+  bool ok = f.read(buf, sz) == sz; f.close();
+  glow::Image img;
+  if (!ok || img.load(buf, sz) || img.kind != glow::K_SHOW) { free(buf); return false; }
+  ShowHost host;
+  uint32_t arena = 0;
+  if (!glowVM->measureArena(img, host, arena)) { free(buf); return false; }
+  size_t need = glow::stateBaseSize(img) + arena;
+  uint8_t *state = (uint8_t *)calloc(1, need);
+  if (!state) { free(buf); return false; }
+  GlowShow &s = glowShow;
+  s.bytes = buf; s.size = sz; s.img = img; s.state = state; s.stateSize = need;
+  strlcpy(s.file, name, sizeof(s.file));
+  uint32_t now = millis();
+  for (uint8_t i = 0; i < img.nEvents && i < 64; i++) s.next[i] = now + img.event(i).arg;
+  glowShowRun(glow::EV_START, 0, false);
+  stateChanged = true;
+  return true;
+}
+
+static void glowShowLoop() {
+  GlowShow &s = glowShow;
+  if (!s.bytes) return;
+  uint32_t now = millis();
+  ShowHost host;
+  for (uint8_t i = 0; i < s.img.nEvents && i < 64 && s.bytes; i++) {
+    glow::Event e = s.img.event(i);
+    if (e.type != glow::EV_EVERY || (int32_t)(now - s.next[i]) < 0) continue;
+    s.next[i] = now + e.arg;
+    if (!glowVM->runEvent(s.img, host, e.fn, s.state, s.stateSize, hw_random() | 1, GLOW_BUDGET)) s.lastError = glowVM->lastError;
+  }
+  if (localTime > 1600000000UL) {   // only once the clock is set
+    uint16_t m = hour(localTime) * 60 + minute(localTime);
+    if (m != s.lastMinute) { bool first = s.lastMinute == 0xffff; s.lastMinute = m; if (!first) glowShowRun(glow::EV_AT, m, true); }
+  }
+  um_data_t *um;
+  if (UsermodManager::getUMData(&um, USERMOD_ID_AUDIOREACTIVE)) {
+    bool peak = *(uint8_t *)um->u_data[3] != 0;
+    if (peak && !s.lastPeak) glowShowRun(glow::EV_BEAT, 0, false);
+    s.lastPeak = peak;
+  }
+}
+
 // Load everything: keep slot assignments from slots.json, give new scripts free slots.
 static void glowReloadAll() {
+  glowShowCount = 0;
   if (!WLED_FS.exists(FPSTR(_glow_dir))) WLED_FS.mkdir(FPSTR(_glow_dir));
 
   char wanted[GLOW_SLOTS][GLOW_NAME_LEN + 1] = {};
@@ -202,6 +430,7 @@ static void glowReloadAll() {
     if (!n.endsWith(F(".glw"))) continue;
     n.remove(n.length() - 4);
     if (!validName(n.c_str())) continue;
+    if (glowFileKind(n.c_str()) == glow::K_SHOW) { glowAddShowName(n.c_str()); continue; }
     bool known = false;
     for (int i = 0; i < GLOW_SLOTS; i++) if (!strcmp(wanted[i], n.c_str())) known = true;
     if (known) continue;
@@ -235,8 +464,31 @@ void glowSetup() {
 }
 
 void glowLoop() {
-  if (glowDeletePending[0]) { glowDelete(glowDeletePending); glowDeletePending[0] = 0; updateFSInfo(); }
-  if (glowReloadPending) { glowReloadPending = false; glowReloadAll(); stateChanged = true; }
+  if (glowDeletePending[0]) {
+    if (!strcmp(glowShow.file, glowDeletePending)) glowShowStop();
+    glowDelete(glowDeletePending); glowDeletePending[0] = 0; updateFSInfo(); glowReloadPending = true;
+  }
+  if (glowReloadPending) {
+    glowReloadPending = false; glowReloadAll(); stateChanged = true;
+    // a reloaded show restarts so it runs the new code
+    if (glowShow.bytes) strlcpy(glowShowPending, glowShow.file, sizeof(glowShowPending));
+  }
+  if (glowShowStopPending) { glowShowStopPending = false; glowShowStop(); }
+  if (glowShowPending[0]) { glowShowStart(glowShowPending); glowShowPending[0] = 0; }
+  glowShowLoop();
+}
+
+bool glowButton(uint8_t b) {
+  if (!glowShow.bytes) return false;
+  for (uint8_t i = 0; i < glowShow.img.nEvents; i++) {
+    glow::Event e = glowShow.img.event(i);
+    if (e.type == glow::EV_BUTTON && e.arg == b) { glowShowRun(glow::EV_BUTTON, b, true); return true; }
+  }
+  return false;
+}
+
+void glowSerializeState(JsonObject root) {
+  if (glowShow.bytes) root.createNestedObject(F("glow"))[F("show")] = glowShow.file;
 }
 
 void glowRequestReload() { glowReloadPending = true; }
@@ -256,15 +508,28 @@ void glowSerializeInfo(JsonObject root) {
     o[F("size")] = s.size;
     if (s.lastError) o[F("err")] = glow::errorText(s.lastError);
   }
+  JsonArray sh = g.createNestedArray(F("shows"));
+  for (int i = 0; i < glowShowCount; i++) sh.add(glowShowNames[i]);
+  if (glowShow.bytes) {
+    g[F("show")] = glowShow.file;
+    if (glowShow.lastError) g[F("showErr")] = glow::errorText(glowShow.lastError);
+  }
 }
 
 void glowDeserializeState(JsonObject g) {
   if (g[F("reload")]) glowRequestReload();
   const char *del = g[F("del")] | "";
   if (del[0] && validName(del)) strlcpy(glowDeletePending, del, sizeof(glowDeletePending));
+  if (g.containsKey(F("show"))) {
+    const char *sh = g[F("show")] | "";
+    if (!sh[0]) glowShowStopPending = true;
+    else if (validName(sh) && strcmp(sh, glowShow.file)) strlcpy(glowShowPending, sh, sizeof(glowShowPending));
+  }
 }
 
 #else
+bool glowButton(uint8_t) { return false; }
+void glowSerializeState(JsonObject) {}
 void glowSetup() {}
 void glowLoop() {}
 void glowRequestReload() {}

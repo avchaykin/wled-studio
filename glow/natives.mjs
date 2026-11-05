@@ -31,7 +31,16 @@ export const NATIVES = [
   ['array', 1, 2, 'any'], ['size', 1, 1, 'any'],
   // audio
   ['audio_band', 1, 1, 'any'],
+  // shows (event scripts): every seg_* takes the segment id first and returns it, so calls chain:
+  //   seg(0).effect("Aurora").palette(next)  ->  seg_palette(seg_effect(seg(0), "Aurora"), -1)
+  ['seg', 1, 1, 'show'], ['seg_effect', 2, 2, 'show'], ['seg_palette', 2, 2, 'show'], ['seg_colors', 2, 4, 'show'],
+  ['seg_speed', 2, 2, 'show'], ['seg_intensity', 2, 2, 'show'], ['seg_bri', 2, 2, 'show'], ['seg_on', 2, 2, 'show'],
+  ['split', 1, 1, 'show'], ['preset', 1, 1, 'show'], ['power', 1, 1, 'show'], ['brightness', 1, 2, 'show'],
+  ['hour', 0, 0, 'show'], ['minute', 0, 0, 'show'], ['segcount', 0, 0, 'show'],
 ];
+
+// Show events (event table entry: u8 type, u8 function, u32 argument)
+export const EVENT = { START: 0, STOP: 1, EVERY: 2, AT: 3, BUTTON: 4, BEAT: 5 };
 
 export const NATIVE_ID = Object.fromEntries(NATIVES.map((n, i) => [n[0], i]));
 export const BUILTIN_ID = Object.fromEntries(BUILTIN_VARS.map((n, i) => [n, i]));

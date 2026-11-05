@@ -55,10 +55,18 @@ export function PresetsPage() {
 
 // ---------------------------------------------------------------- Scripts
 const DRAFT = 'studio.glow.draft';
+// argument part of a show handler (the type is shown as a tag)
+const eventLabel = e => e.type === 'every' ? (e.arg >= 60000 ? `${e.arg / 60000} min` : `${e.arg / 1000} s`)
+  : e.type === 'at' ? `${String(Math.floor(e.arg / 60)).padStart(2, '0')}:${String(e.arg % 60).padStart(2, '0')}`
+  : e.type === 'button' ? `#${e.arg}` : '';
 const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 32) || 'script';
 
 export function ScriptsPage() {
   const slots = useStore(d => d.info?.glow?.slots);
+  const shows = useStore(d => d.info?.glow?.shows);
+  const running = useStore(d => d.info?.glow?.show);
+  const [kind, setKind] = useState('effect');
+  const [events, setEvents] = useState([]);
   const [src, setSrc] = useState(() => { try { return localStorage.getItem(DRAFT) || EXAMPLES[0].src; } catch { return EXAMPLES[0].src; } });
   const [file, setFile] = useState('');
   const [status, setStatus] = useState({ kind: '', msg: '' });
@@ -72,9 +80,13 @@ export function ScriptsPage() {
     const t = setTimeout(() => {
       try {
         const c = compile(src);
-        compiled.current = c; inst.current = new GlowInstance(loadImage(c.image), 1); t0.current = performance.now();
+        compiled.current = c; t0.current = performance.now();
+        inst.current = c.kind === 'effect' ? new GlowInstance(loadImage(c.image), 1) : null;
+        setKind(c.kind); setEvents(c.events ?? []);
         setFile(f => f || slug(c.name));
-        setStatus({ kind: 'ok', msg: `${c.name} · ${c.image.length} bytes · ${c.controls.length} control${c.controls.length === 1 ? '' : 's'}${c.twoD ? ' · 2D' : ''}` });
+        setStatus({ kind: 'ok', msg: c.kind === 'show'
+          ? `${c.name} · show · ${c.events.length} handler${c.events.length === 1 ? '' : 's'} · ${c.image.length} bytes`
+          : `${c.name} · ${c.image.length} bytes · ${c.controls.length} control${c.controls.length === 1 ? '' : 's'}${c.twoD ? ' · 2D' : ''}` });
         setErrLine(null);
       } catch (e) {
         compiled.current = null; inst.current = null;
@@ -131,7 +143,13 @@ export function ScriptsPage() {
     } catch (e) { setStatus({ kind: 'error', msg: e.message }); }
   };
   const refresh = () => getJson('/json/info').then(info => set({ info })).catch(() => {});
-  const run = () => {
+  const run = async () => {
+    if (kind === 'show') {
+      if (!shows?.includes(file)) return setStatus({ kind: 'error', msg: 'Save the show to the device first.' });
+      await postJson('/json/state', { glow: { show: running === file ? '' : file } });
+      setStatus({ kind: 'ok', msg: running === file ? `Stopped ${file}.` : `Started ${file}.` });
+      return setTimeout(refresh, 500);
+    }
     const slot = getState().info?.glow?.slots?.find(x => x.file === file); const s = selSeg();
     if (!slot) return setStatus({ kind: 'error', msg: 'Save the script to the device first.' });
     if (s) editSeg(s.id, { fx: slot.fx, fxdef: true }, { now: true });
@@ -153,7 +171,14 @@ export function ScriptsPage() {
       </header>
       <div class="scripts-grid">
         <div class="editor">
-          <div class="editor-preview"><canvas ref={cv} class="preview-canvas" aria-label="Script preview" /></div>
+          <div class="editor-preview">
+            <canvas ref={cv} class="preview-canvas" aria-label="Script preview" hidden={kind === 'show'} />
+            {kind === 'show' && (
+              <ul class="eventlist" aria-label="Show handlers">
+                {events.map((e, i) => <li key={i}><span class="tag">{e.type}</span>{eventLabel(e)}</li>)}
+              </ul>
+            )}
+          </div>
           <div class="editor-body">
             <div class="gutter" ref={gutter} aria-hidden="true">
               {Array.from({ length: lines }, (_, i) => <div key={i} class={i + 1 === errLine ? 'err' : ''}>{i + 1}</div>)}
@@ -174,7 +199,7 @@ export function ScriptsPage() {
               <input class="mono" value={file} onInput={e => setFile(e.currentTarget.value)} aria-label="File name on device" maxLength={32} spellcheck={false} />
             </label>
             <Button primary icon="upload" onClick={save}>Save to device <Kbd>{navigator.platform.includes('Mac') ? '⌘S' : 'Ctrl S'}</Kbd></Button>
-            <Button icon="play" onClick={run}>Run on selected segment</Button>
+            <Button icon="play" onClick={run}>{kind === 'show' ? (running === file ? 'Stop show' : 'Start show') : 'Run on selected segment'}</Button>
           </div>
         </div>
         <aside class="devscripts" aria-label="Scripts on this device">
@@ -192,6 +217,21 @@ export function ScriptsPage() {
                 ))}
               </ul>
             )}
+          {shows?.length > 0 && (
+            <>
+              <h3 class="spaced">Shows</h3>
+              <ul class="filelist">
+                {shows.map(name => (
+                  <li key={name} class={name === file ? 'current' : ''}>
+                    <button type="button" class="file" onClick={() => openFile(name)}><span class="mono">{name}</span>{running === name && <span class="tag accent">Running</span>}</button>
+                    <IconButton icon={running === name ? 'close' : 'play'} label={running === name ? `Stop ${name}` : `Start ${name}`}
+                      onClick={async () => { await postJson('/json/state', { glow: { show: running === name ? '' : name } }); setTimeout(refresh, 500); }} />
+                    <IconButton icon="trash" label={`Delete ${name}`} tone="danger" onClick={async () => { await postJson('/json/state', { glow: { del: name } }); setTimeout(refresh, 600); }} />
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
         </aside>
       </div>
     </div>

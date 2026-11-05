@@ -21,6 +21,7 @@ static bool buttonBriDirection = false; // true: increase brightness, false: dec
 
 void shortPressAction(uint8_t b)
 {
+  if (glowButton(b)) return; // a running Glow show handles this button
   if (!buttons[b].macroButton) {
     switch (b) {
       case 0: toggleOnOff(); stateUpdated(CALL_MODE_BUTTON); break;

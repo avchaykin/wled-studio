@@ -369,3 +369,6 @@ input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px rg
 .mrect.sel .clip-label { background: var(--acc-fill); color: #fff; }
 .mdraw { position: absolute; border: 1px dashed #fff; background: rgb(91 140 255 / .18); pointer-events: none; display: grid; place-items: center; }
 .mdraw .cursor-chip { position: static; transform: none; }
+.eventlist { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 14px; min-height: 40px; align-items: center; }
+.eventlist li { display: inline-flex; align-items: center; gap: 6px; color: var(--tx2); font-size: 12px; }
+.devscripts h3.spaced { margin-top: 18px; }

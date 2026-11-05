@@ -4,7 +4,7 @@ import { readFileSync, readdirSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { compile } from '../compiler.mjs';
-import { loadImage, GlowInstance, runFrame, GlowRuntimeError, hsv } from '../vm.mjs';
+import { loadImage, GlowInstance, runFrame, runEvent, GlowRuntimeError, hsv } from '../vm.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const examplesDir = join(here, '..', 'examples');
@@ -32,6 +32,12 @@ test('every example compiles and runs 50 frames', () => {
     const src = readFileSync(join(examplesDir, f), 'utf8');
     const out = compile(src);
     assert.ok(out.image.length < 4096, `${f} image is ${out.image.length} bytes`);
+    if (out.kind === 'show') {
+      const inst = new GlowInstance(loadImage(out.image), 1); const calls = [];
+      for (const e of inst.img.events) runEvent(inst, { show: (n, a) => { calls.push(n); return n.startsWith('seg') ? a[0] : 0; } }, e.fn);
+      assert.ok(calls.length > 0, `${f} made no calls`);
+      continue;
+    }
     const h = host(60, { audio: { vol: 100, bands: new Array(16).fill(50) } });
     const inst = new GlowInstance(loadImage(out.image), 1);
     for (let k = 0; k < 50; k++) { h.t = k * 25; runFrame(inst, h); }
@@ -163,4 +169,33 @@ test('compile errors carry line numbers and helpful text', () => {
 test('durations and colour shorthands', () => {
   const { h } = run('effect "A" { fn pixel(i) { return i == 0 ? rgb(2s / 1000, 250ms / 10, 0) : #0f8 } }', host(2));
   assert.deepEqual([...h.pixels], [0x021900, 0x00ff88]);
+});
+
+test('show scripts: events, chained segment calls, strings, next', () => {
+  const r = compile(`show "S" {
+    var n = 0
+    on start { split(3) seg(2).effect("Comet").palette(next).colors(#ff0000, #00ff00).speed(9).on(true) }
+    every 5s { n += 1 brightness(n * 10, 2s) }
+    at "07:05" { power(true) }
+    on button(1) { preset("Night") }
+  }`);
+  assert.equal(r.kind, 'show');
+  assert.deepEqual(r.events.map(e => [e.type, e.arg]), [['start', 0], ['every', 5000], ['at', 425], ['button', 1]]);
+  const inst = new GlowInstance(loadImage(r.image), 1);
+  const calls = [];
+  const host = { show: (n, a) => { calls.push(`${n}(${a.join(',')})`); return n.startsWith('seg') ? a[0] : 0; } };
+  for (const e of inst.img.events) runEvent(inst, host, e.fn);
+  runEvent(inst, host, inst.img.events[1].fn);
+  assert.deepEqual(calls, ['split(3)', 'seg(2)', 'seg_effect(2,Comet)', 'seg_palette(2,-1)', 'seg_colors(2,16711680,65280)',
+    'seg_speed(2,9)', 'seg_on(2,true)', 'brightness(10,2000)', 'power(true)', 'preset(Night)', 'brightness(20,2000)']);
+});
+
+test('show/effect separation is enforced', () => {
+  throwsAt('effect "A" { fn frame() { split(2) } }', /only available in show scripts/);
+  throwsAt('effect "A" { fn frame() { seg(0) } }', /only available in show scripts/);
+  throwsAt('show "S" { on start { fade(10) } }', /draws pixels/);
+  throwsAt('show "S" { var x = 1 }', /needs at least one handler/);
+  throwsAt('show "S" { every 10 { } }', /at least 50ms/);
+  throwsAt('show "S" { at "25:00" { } }', /time like/);
+  throwsAt('show "S" { on sunrise { } }', /unknown event/);
 });

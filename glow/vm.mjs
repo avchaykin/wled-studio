@@ -17,8 +17,8 @@ export function loadImage(bytes) {
   if (b[4] !== 1) throw new GlowRuntimeError(`unsupported image version ${b[4]}`);
   const img = {
     kind: b[5], flags: b[6], nGlobals: b[7], nConsts: b[8], nStrings: b[9], nFuncs: b[10], nControls: b[11],
-    initFn: b[12], mainFn: b[13], codeLen: dv.getUint16(16, true), metaLen: dv.getUint16(18, true),
-    consts: [], strings: [], funcs: [],
+    initFn: b[12], mainFn: b[13], nEvents: b[14], codeLen: dv.getUint16(16, true), metaLen: dv.getUint16(18, true),
+    consts: [], strings: [], funcs: [], events: [],
   };
   let p = 20;
   for (let i = 0; i < img.nConsts; i++) {
@@ -29,6 +29,7 @@ export function loadImage(bytes) {
   for (let i = 0; i < img.nStrings; i++) { const l = b[p++]; img.strings.push(new TextDecoder().decode(b.subarray(p, p + l))); p += l; }
   for (let i = 0; i < img.nFuncs; i++) { img.funcs.push({ off: dv.getUint16(p, true), nargs: b[p + 2], nlocals: b[p + 3] }); p += 4; }
   img.meta = new TextDecoder().decode(b.subarray(p, p + img.metaLen)); p += img.metaLen;
+  for (let i = 0; i < img.nEvents; i++) { img.events.push({ type: b[p], fn: b[p + 1], arg: dv.getUint32(p + 2, true) }); p += 6; }
   img.code = b.subarray(p, p + img.codeLen);
   if (p + img.codeLen !== b.length) throw new GlowRuntimeError('image size mismatch');
   return img;
@@ -146,6 +147,17 @@ export function runFrame(inst, host, budget = DEFAULT_BUDGET) {
     }
   } else exec(ctx, img.mainFn, []);
   inst.frame++;
+}
+
+/**
+ * Run one show event handler (function index from img.events[].fn).
+ * host.show(name, args) receives show natives (seg_effect, preset, ...) with strings decoded; returns a number.
+ */
+export function runEvent(inst, host, fnIndex, budget = DEFAULT_BUDGET) {
+  const img = inst.img;
+  const ctx = { inst, host, budget, pixelMode: false };
+  if (!inst.inited) { if (img.initFn !== 255) exec(ctx, img.initFn, []); inst.inited = true; }
+  exec(ctx, fnIndex, []);
 }
 
 function toColor(v, t) {
@@ -272,6 +284,7 @@ function exec(ctx, fnIndex, args) {
         if (i >= 0 && i < arr.data.length) arr.data[i] = v;
         break;
       }
+      case OP.PUSHS: { const k = code[pc++]; if (k >= img.strings.length) throw new GlowRuntimeError('bad string'); push(k, TAG.STR); break; }
       case OP.ARRLIT: {
         const n = code[pc++];
         if (sp - n < frames[frames.length - 1].base) throw new GlowRuntimeError('stack underflow');
@@ -432,6 +445,18 @@ function native(ctx, name, base, argc, sv, st, num, col) {
     }
     case 'size': return n1(arrayOf(inst, sv[base], st[base]).data.length);
     case 'audio_band': { const k = Math.floor(N(0)); return n1(k >= 0 && k < 16 ? (h.audio?.bands?.[k] ?? 0) : 0); }
-    default: throw new GlowRuntimeError(`native ${name} not implemented`);
+    default: {
+      // show natives go to the host; strings arrive decoded, colours as numbers
+      if (NATIVES.find(n => n[0] === name)?.[3] === 'show') {
+        const args = [];
+        for (let k = 0; k < argc; k++) {
+          const t = st[base + k], v = sv[base + k];
+          args.push(t === TAG.STR ? inst.img.strings[v] : t === TAG.COLOR ? v >>> 0 : t === TAG.BOOL ? !!v : v);
+        }
+        const r = h.show ? h.show(name, args) : 0;
+        return n1(typeof r === 'number' ? r : 0);
+      }
+      throw new GlowRuntimeError(`native ${name} not implemented`);
+    }
   }
 }

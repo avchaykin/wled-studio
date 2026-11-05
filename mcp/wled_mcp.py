@@ -443,9 +443,11 @@ def glow_check(source: str) -> dict:
 
 
 @mcp.tool()
-def glow_install(file_name: str, source: str, run_on_segment: int | None = None, device: str | None = None) -> dict:
-    """Compile a Glow effect, upload it as /glow/<file_name>.glow/.glw and load it. It then appears as a normal effect.
-    file_name: lowercase letters, digits, - and _. Optionally apply it to a segment right away."""
+def glow_install(file_name: str, source: str, run_on_segment: int | None = None, start_show: bool = False, device: str | None = None) -> dict:
+    """Compile a Glow script, upload it as /glow/<file_name>.glow/.glw and load it.
+    Effects appear as normal effects (optionally applied to run_on_segment). Shows are event scripts
+    (on start / every / at / button / beat) that orchestrate segments; start_show=true starts one now.
+    file_name: lowercase letters, digits, - and _."""
     if not re.fullmatch(r"[a-z0-9_-]{1,32}", file_name):
         raise ValueError("file_name must be 1-32 chars of a-z, 0-9, - and _")
     host = _host(device)
@@ -458,6 +460,16 @@ def glow_install(file_name: str, source: str, run_on_segment: int | None = None,
         body, ct = _multipart(f"/glow/{file_name}{suffix}", data, ctype)
         _http(host, "/upload", raw=body, headers={"Content-Type": ct}, timeout=15)
     _state(host, {"glow": {"reload": True}})
+    if res.get("kind") == "show":
+        for _ in range(20):
+            time.sleep(0.25)
+            if file_name in ((_http(host, "/json/info").get("glow") or {}).get("shows") or []):
+                break
+        else:
+            raise RuntimeError("Uploaded, but the device did not list the show")
+        if start_show:
+            _state(host, {"glow": {"show": file_name}})
+        return {"installed": file_name, "kind": "show", "show_name": res["name"], "bytes": res["size"], "started": start_show}
     slot = None
     for _ in range(20):
         time.sleep(0.25)
@@ -474,9 +486,21 @@ def glow_install(file_name: str, source: str, run_on_segment: int | None = None,
 
 
 @mcp.tool()
-def glow_scripts(device: str | None = None) -> list[dict]:
-    """Glow scripts installed on the device, with their effect id and any runtime error."""
-    return (_http(_host(device), "/json/info").get("glow") or {}).get("slots", [])
+def glow_scripts(device: str | None = None) -> dict:
+    """Glow scripts on the device: effects (with effect id and any runtime error), shows, and the running show."""
+    g = _http(_host(device), "/json/info").get("glow") or {}
+    return {"effects": g.get("slots", []), "shows": g.get("shows", []), "running_show": g.get("show"), "show_error": g.get("showErr")}
+
+
+@mcp.tool()
+def glow_show(name: str | None = None, device: str | None = None) -> dict:
+    """Start the installed show `name`, or stop the running show when name is omitted/empty.
+    A running show is part of the state, so saving a preset while it runs makes that preset start it."""
+    host = _host(device)
+    _state(host, {"glow": {"show": name or ""}})
+    time.sleep(0.4)
+    g = _http(host, "/json/info").get("glow") or {}
+    return {"running_show": g.get("show"), "error": g.get("showErr")}
 
 
 @mcp.tool()

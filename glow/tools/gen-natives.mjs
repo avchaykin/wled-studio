@@ -3,7 +3,7 @@
 import { writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { OP, NATIVES, BUILTIN_VARS, TAG, KIND, CONTROL } from '../natives.mjs';
+import { OP, NATIVES, BUILTIN_VARS, TAG, KIND, CONTROL, EVENT } from '../natives.mjs';
 
 const out = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'wled00', 'glow_natives.h');
 const up = s => s.toUpperCase();
@@ -26,6 +26,8 @@ const lines = [
   `static const uint8_t NATIVE_ARGC[N_COUNT][2] = { ${NATIVES.map(n => `{${n[1]},${n[2]}}`).join(', ')} };`,
   '// 1 = drawing native (not allowed inside pixel())',
   `static const uint8_t NATIVE_DRAWS[N_COUNT] = { ${NATIVES.map(n => (n[3] === 'frame' ? 1 : 0)).join(',')} };`,
+  '// 1 = show-only native (handled by Host::show)',
+  `static const uint8_t NATIVE_SHOW[N_COUNT] = { ${NATIVES.map(n => (n[3] === 'show' ? 1 : 0)).join(',')} };`,
   '',
   'enum Builtin : uint8_t {',
   ...BUILTIN_VARS.map((n, i) => `  B_${up(n)} = ${i},`),
@@ -35,6 +37,7 @@ const lines = [
   'enum Tag : uint8_t {', ...Object.entries(TAG).map(([k, v]) => `  T_${k} = ${v},`), '};',
   'enum Kind : uint8_t {', ...Object.entries(KIND).map(([k, v]) => `  K_${k} = ${v},`), '};',
   'enum Control : uint8_t {', ...Object.entries(CONTROL).map(([k, v]) => `  C_${k} = ${v},`), '};',
+  'enum EventType : uint8_t {', ...Object.entries(EVENT).map(([k, v]) => `  EV_${k} = ${v},`), '};',
   '',
   '} // namespace glow',
   '',

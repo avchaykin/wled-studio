@@ -654,6 +654,7 @@ void serializeState(JsonObject root, bool forPreset, bool includeBri, bool segme
     root[F("transition")] = transitionDelay/100; //in 100ms
     root[F("bs")] = blendingStyle;
   }
+  glowSerializeState(root); // running Glow show (also stored in presets, so a preset can start a show)
 
   if (!forPreset) {
     if (errorFlag) {root[F("error")] = errorFlag; errorFlag = ERR_NONE;} //prevent error message to persist on screen

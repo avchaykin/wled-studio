@@ -41,7 +41,11 @@ int main(int argc, char **argv) {
       if (!vm.measureArena(im, h, arena)) continue;
       if (arena > 1 << 20) continue;
       std::vector<uint8_t> state(glow::stateBaseSize(im) + arena, 0);
-      for (int fr = 0; fr < 3; fr++) { h.t = fr * 25; if (!vm.runFrame(im, h, state.data(), state.size(), 7, 5000)) break; }
+      if (im.kind == glow::K_SHOW) {
+        for (uint8_t e = 0; e < im.nEvents; e++) if (!vm.runEvent(im, h, im.event(e).fn, state.data(), state.size(), 7, 5000)) break;
+      } else {
+        for (int fr = 0; fr < 3; fr++) { h.t = fr * 25; if (!vm.runFrame(im, h, state.data(), state.size(), 7, 5000)) break; }
+      }
       ran++;
     }
   }

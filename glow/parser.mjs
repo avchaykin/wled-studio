@@ -78,7 +78,8 @@ export function parse(src) {
         e = node('call', t, { callee: e, args, named });
       } else if (isOp('.') ) {
         const t = next();
-        const prop = expect('id').value;
+        // keywords are fine as method names: seg(0).on(false)
+        const prop = at('kw') ? next().value : expect('id').value;
         e = node('member', t, { obj: e, prop });
       } else if (isOp('[')) {
         const t = next();

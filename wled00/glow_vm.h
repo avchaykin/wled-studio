@@ -17,6 +17,7 @@ struct Value {
 };
 
 struct Func { uint16_t off; uint8_t nargs; uint8_t nlocals; };
+struct Event { uint8_t type; uint8_t fn; uint32_t arg; };   // show handler (type: Event enum)
 
 // Parsed view over a program image; does not own the bytes.
 struct Image {
@@ -24,7 +25,10 @@ struct Image {
   size_t size = 0;
   uint8_t kind = 0, flags = 0, nGlobals = 0, nConsts = 0, nStrings = 0, nFuncs = 0, nControls = 0;
   uint8_t initFn = 255, mainFn = 255;
+  uint8_t nEvents = 0;
   const uint8_t *consts = nullptr;  // 5 bytes each
+  const uint8_t *strings = nullptr; // u8 length + bytes, nStrings times
+  const uint8_t *events = nullptr;  // 6 bytes each
   const uint8_t *funcs = nullptr;   // 4 bytes each
   const char *meta = nullptr;       // not NUL terminated
   uint16_t metaLen = 0;
@@ -36,6 +40,9 @@ struct Image {
   // Validates header and section bounds. Returns nullptr on success or an error message.
   const char *load(const uint8_t *data, size_t len);
   Func func(uint8_t i) const;
+  Event event(uint8_t i) const;
+  // string constant i (not NUL terminated); returns length, or -1 if out of range
+  int str(uint8_t i, const char **out) const;
 private:
   // Checks every instruction: operands in range, jumps land on instruction starts inside
   // their function, consistent stack depth at merge points, no underflow, no fall-through.
@@ -57,6 +64,9 @@ public:
   virtual uint32_t getPixel(int i) = 0;
   virtual void setPixel(int i, uint32_t c) = 0;
   virtual uint32_t palette(uint8_t i) = 0;
+  // Show natives (seg_effect, preset, ...): args as VM values; strings via img.str().
+  // Return false with no side effects to report a type error.
+  virtual bool show(uint8_t native, const Value *args, uint8_t argc, const Image &img, Value &out) { (void)native; (void)args; (void)argc; (void)img; out.f = 0; out.tag = T_NUM; return true; }
 };
 
 // Per-segment persistent state lives in caller-provided memory:
@@ -96,6 +106,8 @@ public:
   // Run one frame. `state` must be stateBaseSize(img)+arena bytes, zeroed on first use;
   // on first call initialises with given seed.
   bool runFrame(const Image &img, Host &host, uint8_t *state, size_t stateSize, uint32_t seed, uint32_t budget = DEFAULT_BUDGET);
+  // Run one show handler (function index from Image::event()); initialises state on first use.
+  bool runEvent(const Image &img, Host &host, uint8_t fn, uint8_t *state, size_t stateSize, uint32_t seed, uint32_t budget = DEFAULT_BUDGET);
   uint8_t lastError = E_OK;
   const char *lastDetail = "";
 
@@ -117,6 +129,7 @@ private:
   bool exec(uint8_t fn, const Value *args, uint8_t nargs, Value &result);  // image must be verified
   bool native(uint8_t id, Value *a, uint8_t argc, Value &out);
   bool fail(uint8_t e, const char *detail = "");
+  bool prepare(const Image &img, Host &host, uint8_t *state, size_t stateSize, uint32_t seed, uint32_t budget);
   bool allocArray(uint8_t tag, uint16_t n, Value &out, uint32_t **data);
   float rngFloat();
   void setAA(float pos, uint32_t c, bool additive);

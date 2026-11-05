@@ -84,13 +84,30 @@ enum Native : uint8_t {
   N_ARRAY = 38,
   N_SIZE = 39,
   N_AUDIO_BAND = 40,
-  N_COUNT = 41
+  N_SEG = 41,
+  N_SEG_EFFECT = 42,
+  N_SEG_PALETTE = 43,
+  N_SEG_COLORS = 44,
+  N_SEG_SPEED = 45,
+  N_SEG_INTENSITY = 46,
+  N_SEG_BRI = 47,
+  N_SEG_ON = 48,
+  N_SPLIT = 49,
+  N_PRESET = 50,
+  N_POWER = 51,
+  N_BRIGHTNESS = 52,
+  N_HOUR = 53,
+  N_MINUTE = 54,
+  N_SEGCOUNT = 55,
+  N_COUNT = 56
 };
 
 // min/max argument counts per native, indexed by Native
-static const uint8_t NATIVE_ARGC[N_COUNT][2] = { {1,1}, {1,1}, {1,1}, {1,1}, {1,1}, {1,1}, {2,2}, {2,2}, {3,3}, {1,1}, {1,1}, {1,1}, {1,1}, {3,3}, {3,3}, {1,1}, {2,2}, {5,5}, {0,1}, {1,3}, {1,1}, {3,4}, {3,3}, {1,1}, {3,3}, {2,2}, {1,1}, {1,1}, {1,1}, {1,1}, {1,1}, {2,3}, {2,2}, {1,2}, {1,1}, {1,1}, {1,1}, {1,1}, {1,2}, {1,1}, {1,1} };
+static const uint8_t NATIVE_ARGC[N_COUNT][2] = { {1,1}, {1,1}, {1,1}, {1,1}, {1,1}, {1,1}, {2,2}, {2,2}, {3,3}, {1,1}, {1,1}, {1,1}, {1,1}, {3,3}, {3,3}, {1,1}, {2,2}, {5,5}, {0,1}, {1,3}, {1,1}, {3,4}, {3,3}, {1,1}, {3,3}, {2,2}, {1,1}, {1,1}, {1,1}, {1,1}, {1,1}, {2,3}, {2,2}, {1,2}, {1,1}, {1,1}, {1,1}, {1,1}, {1,2}, {1,1}, {1,1}, {1,1}, {2,2}, {2,2}, {2,4}, {2,2}, {2,2}, {2,2}, {2,2}, {1,1}, {1,1}, {1,1}, {1,2}, {0,0}, {0,0}, {0,0} };
 // 1 = drawing native (not allowed inside pixel())
-static const uint8_t NATIVE_DRAWS[N_COUNT] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,0,0,0 };
+static const uint8_t NATIVE_DRAWS[N_COUNT] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0 };
+// 1 = show-only native (handled by Host::show)
+static const uint8_t NATIVE_SHOW[N_COUNT] = { 0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1 };
 
 enum Builtin : uint8_t {
   B_T = 0,
@@ -130,6 +147,14 @@ enum Kind : uint8_t {
 enum Control : uint8_t {
   C_SLIDER = 0,
   C_TOGGLE = 1,
+};
+enum EventType : uint8_t {
+  EV_START = 0,
+  EV_STOP = 1,
+  EV_EVERY = 2,
+  EV_AT = 3,
+  EV_BUTTON = 4,
+  EV_BEAT = 5,
 };
 
 } // namespace glow
