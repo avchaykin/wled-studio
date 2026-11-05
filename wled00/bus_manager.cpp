@@ -1731,8 +1731,17 @@ void BusManager::applyABL() {
       if (milliAmpsSum > globalMax) { // check if global current limit is exceeded
         newBri = globalMax * 255 / milliAmpsSum + 1; // scale brightness down to stay in current limit, +1 to avoid 0 brightness
         if (newBri == 0) newBri = 1; // safety clamp
-        milliAmpsSum = globalMax; // update total used current
       }
+      // Smooth the limiter: tighten at once (protects the supply), loosen by 1/8 of the gap per
+      // frame (~0.5 s), so the scale does not jump with each frame's content, which shows as
+      // pumping/flicker on moving effects. The applied value never exceeds this frame's limit.
+      static uint16_t ablBri88 = 255U << 8; // applied limiter brightness, 8.8 fixed point
+      const uint16_t target = (uint16_t)newBri << 8;
+      if (target <= ablBri88) ablBri88 = target;
+      else ablBri88 += (target - ablBri88 + 7) >> 3;
+      newBri = ablBri88 >> 8;
+      if (newBri == 0) newBri = 1;
+      if (newBri < 255) milliAmpsSum = (uint32_t)milliAmpsSum * newBri / 255; // estimated current after limiting
 
       // apply brightness limit to each bus; resets bus _colorSum for next frame
       for (auto &bus : busses) {
