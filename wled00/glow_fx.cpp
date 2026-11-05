@@ -133,10 +133,25 @@ static bool validName(const char *n) {
   return true;
 }
 
+// Effect metadata strings are also read by web-server requests (/json/eff, /json/fxdata, effect
+// name lookups) on the async TCP task. A replaced string is freed only after a grace period, so
+// a request that picked up the old pointer never reads freed memory.
+#define GLOW_RETIRED 32
+static struct { char *p; uint32_t t; } glowRetired[GLOW_RETIRED];
+static void glowRetire(char *p) {
+  if (!p) return;
+  for (auto &r : glowRetired) if (!r.p) { r.p = p; r.t = millis(); return; }
+  // all entries busy (> 32 reloads within the grace period): keep it rather than risk a use-after-free
+}
+static void glowFreeRetired() {
+  uint32_t now = millis();
+  for (auto &r : glowRetired) if (r.p && now - r.t > 5000) { free(r.p); r.p = nullptr; }
+}
+
 static void glowUnload(GlowSlot &s) {
   if (s.fxId != 255) strip.setModeData(s.fxId, _glow_rsvd);
   free(s.bytes); s.bytes = nullptr; s.size = 0;
-  free(s.modeData); s.modeData = nullptr;
+  glowRetire(s.modeData); s.modeData = nullptr;
   s.file[0] = 0; s.lastError = 0;
   s.generation++;
 }
@@ -470,6 +485,7 @@ void glowSetup() {
 }
 
 void glowLoop() {
+  glowFreeRetired();
   if (glowDeletePending[0]) {
     if (!strcmp(glowShow.file, glowDeletePending)) glowShowStop();
     glowDelete(glowDeletePending); glowDeletePending[0] = 0; updateFSInfo(); glowReloadPending = true;
