@@ -24,7 +24,8 @@ The `wled-studio` MCP server talks to WLED controllers over their JSON API. Tool
 - Effects flagged `audio` react to sound only if the device has a microphone (AudioReactive); otherwise they idle.
 - `brightness` on `wled_power` is the master (1–255); per-segment `brightness` is relative opacity.
 - Presets store whole looks. Applying one replaces the current layout.
-- Several devices may be configured; pass `device=` (name from `wled_devices`) when the user names a specific one.
+- Several devices may be configured; pass `device=` (name from `wled_devices`) when the user names a specific one ("on the stairs", "Stairs LED" -> `device="stairs"`). Without `device=`, tools act on the first (default) device. A new controller is added with `wled_add_device(name, address)` and remembered.
+- "Specific LEDs" within one device are segments: LED ranges `[start, stop)`. When the user describes physical parts (steps, sides, zones), ask once how they map to LED ranges unless the layout is already known, then use `wled_layout`.
 
 ## Glow scripts (custom effects)
 

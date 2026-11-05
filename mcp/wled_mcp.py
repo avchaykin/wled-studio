@@ -48,17 +48,17 @@ mcp = FastMCP(
 
 
 def _load_devices() -> dict[str, str]:
+    """WLED_DEVICES (first entry is the default) plus devices remembered by wled_add_device."""
     devs: dict[str, str] = {}
-    env = os.environ.get("WLED_DEVICES", "").strip()
-    if env:
-        for part in env.split(","):
-            if "=" in part:
-                k, v = part.split("=", 1)
-                devs[k.strip()] = v.strip()
-            elif part.strip():
-                devs[part.strip()] = part.strip()
-    elif CONFIG.exists():
-        devs.update(json.loads(CONFIG.read_text()))
+    for part in os.environ.get("WLED_DEVICES", "").split(","):
+        if "=" in part:
+            k, v = part.split("=", 1)
+            devs[k.strip()] = v.strip()
+        elif part.strip():
+            devs[part.strip()] = part.strip()
+    if CONFIG.exists():
+        for k, v in json.loads(CONFIG.read_text()).items():
+            devs.setdefault(k, v)
     return devs
 
 
@@ -73,6 +73,9 @@ def _host(device: str | None) -> str:
         return next(iter(DEVICES.values()))
     if device in DEVICES:
         return DEVICES[device]
+    for name, host in DEVICES.items():  # "Stairs", "stairs led" -> "stairs"
+        if device.lower().removesuffix(" led").strip() == name.lower():
+            return host
     if re.fullmatch(r"[\w.\-:]+", device) and ("." in device or ":" in device):
         return device  # raw host/IP
     raise ValueError(f"Unknown device '{device}'. Known: {', '.join(DEVICES)}")
@@ -250,8 +253,10 @@ def wled_add_device(name: str, address: str) -> dict:
     """Register a device for this session (and remember it in ~/.config/wled-studio/devices.json)."""
     info = _http(address, "/json/info")
     DEVICES[name] = address
+    saved = json.loads(CONFIG.read_text()) if CONFIG.exists() else {}
+    saved[name] = address
     CONFIG.parent.mkdir(parents=True, exist_ok=True)
-    CONFIG.write_text(json.dumps(DEVICES, indent=2))
+    CONFIG.write_text(json.dumps(saved, indent=2))
     return {"added": name, "address": address, "firmware": info.get("ver"), "leds": info.get("leds", {}).get("count")}
 
 
