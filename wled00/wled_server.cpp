@@ -215,7 +215,9 @@ static void handleUpload(AsyncWebServerRequest *request, const String& filename,
       finalname = '/' + finalname; // prepend slash if missing
     }
 
-    request->_tempFile = WLED_FS.open(finalname, "w");
+    // write to <name>.part and rename when complete, so an aborted upload never leaves a
+    // truncated file under the real name (e.g. a cut-off /studio.htm overriding the UI)
+    request->_tempFile = WLED_FS.open(finalname + F(".part"), "w");
     DEBUG_PRINTF_P(PSTR("Uploading %s\n"), finalname.c_str());
     if (finalname.equals(FPSTR(getPresetsFileName()))) presetsModifiedTime = toki.second();
   }
@@ -223,7 +225,18 @@ static void handleUpload(AsyncWebServerRequest *request, const String& filename,
     request->_tempFile.write(data,len);
   }
   if (isFinal) {
+    String part = request->_tempFile.path();
     request->_tempFile.close();
+    if (part.endsWith(F(".part"))) {
+      String finalname = part.substring(0, part.length() - 5);
+      WLED_FS.remove(finalname);
+      if (!WLED_FS.rename(part, finalname)) {
+        WLED_FS.remove(part);
+        request->send(500, FPSTR(CONTENT_TYPE_PLAIN), F("Upload failed"));
+        updateFSInfo();
+        return;
+      }
+    }
     if (filename.indexOf(F("cfg.json")) >= 0) { // check for filename with or without slash
       doReboot = true;
       request->send(200, FPSTR(CONTENT_TYPE_PLAIN), F("Config restore ok.\nRebooting..."));
@@ -235,6 +248,21 @@ static void handleUpload(AsyncWebServerRequest *request, const String& filename,
     cacheInvalidate++;
     updateFSInfo(); // refresh memory usage info
   }
+}
+
+// remove <name>.part leftovers of aborted uploads (collect first, delete with the directory closed)
+static void removePartialUploads() {
+  String names[8]; int n = 0;
+  File dir = WLED_FS.open("/");
+  while (dir && n < 8) {
+    File e = dir.openNextFile();
+    if (!e) break;
+    String nm = e.name();
+    if (!e.isDirectory() && nm.endsWith(F(".part"))) names[n++] = nm.charAt(0) == '/' ? nm : '/' + nm;
+  }
+  if (dir) dir.close();
+  for (int i = 0; i < n; i++) WLED_FS.remove(names[i]);
+  if (n) updateFSInfo();
 }
 
 static const char _edit_htm[] PROGMEM = "/edit.htm";
@@ -350,6 +378,7 @@ static bool captivePortal(AsyncWebServerRequest *request)
 
 void initServer()
 {
+  removePartialUploads();
   //CORS compatiblity
   DefaultHeaders::Instance().addHeader(F("Access-Control-Allow-Origin"), "*");
   DefaultHeaders::Instance().addHeader(F("Access-Control-Allow-Methods"), "*");
