@@ -19,7 +19,7 @@
   #define GLOW_SLOTS 16
 #endif
 #ifndef GLOW_BUDGET
-  #define GLOW_BUDGET 100000    // VM instructions per segment per frame
+  #define GLOW_BUDGET 60000     // loop iterations + calls + built-in calls per segment per frame
 #endif
 #ifndef GLOW_FX_BASE
   #define GLOW_FX_BASE 230      // first effect ID used by Glow slots (stable across reboots and usermod changes)

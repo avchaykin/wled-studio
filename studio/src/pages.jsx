@@ -101,7 +101,7 @@ export function ScriptsPage() {
         colors: (s?.col ?? [[255, 160, 0], [0, 0, 0], [0, 0, 0]]).map(x => (((x[3] ?? 0) << 24) | (x[0] << 16) | (x[1] << 8) | x[2]) >>> 0),
         palette: k => paletteAt(stops, k), audio: { vol: 0, bands: new Array(16).fill(0) },
       };
-      try { runFrame(i, host, 400000); } catch (e) { setStatus({ kind: 'error', msg: `Runtime: ${e.message}` }); inst.current = null; return; }
+      try { runFrame(i, host); } catch (e) { setStatus({ kind: 'error', msg: `Runtime: ${e.message}` }); inst.current = null; return; }
       if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
       const ctx = canvas.getContext('2d'); const img = ctx.createImageData(w, h);
       for (let k = 0; k < w * h; k++) {

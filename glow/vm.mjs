@@ -102,7 +102,8 @@ export class Rng {
 
 // ---------- VM ----------
 const STACK = 256, FRAMES = 32;
-export const DEFAULT_BUDGET = 200000;
+// counted in loop iterations (backward jumps), calls and built-in calls, like the C++ VM
+export const DEFAULT_BUDGET = 60000;
 
 // Per-segment instance: holds persistent globals and arrays.
 export class GlowInstance {
@@ -178,8 +179,8 @@ function exec(ctx, fnIndex, args) {
   const col = k => { if (st[k] !== TAG.COLOR) throw new GlowRuntimeError(`expected a colour, got ${tagName(st[k])}`); return sv[k] >>> 0; };
   const s16 = () => { const v = code[pc] | (code[pc + 1] << 8); pc += 2; return v >= 0x8000 ? v - 0x10000 : v; };
 
+  const tick = () => { if (--ctx.budget < 0) throw new GlowRuntimeError('script too slow: instruction budget exceeded'); };
   for (;;) {
-    if (--ctx.budget < 0) throw new GlowRuntimeError('script too slow: instruction budget exceeded');
     if (pc < 0 || pc >= code.length) throw new GlowRuntimeError('pc out of range');
     const op = code[pc++];
     switch (op) {
@@ -237,10 +238,10 @@ function exec(ctx, fnIndex, args) {
         const r = op === OP.LT ? x < y : op === OP.LE ? x <= y : op === OP.GT ? x > y : x >= y;
         push(r ? 1 : 0, TAG.BOOL); break;
       }
-      case OP.JMP: { const d = s16(); pc += d; break; }
-      case OP.JZ: { const d = s16(); const a = pop(); if (!truthy(sv[a], st[a])) pc += d; break; }
-      case OP.JNZ: { const d = s16(); const a = pop(); if (truthy(sv[a], st[a])) pc += d; break; }
-      case OP.CALL: { const fi = code[pc++]; pc = enter(fi, pc); break; }
+      case OP.JMP: { const d = s16(); pc += d; if (d < 0) tick(); break; }
+      case OP.JZ: { const d = s16(); const a = pop(); if (!truthy(sv[a], st[a])) { pc += d; if (d < 0) tick(); } break; }
+      case OP.JNZ: { const d = s16(); const a = pop(); if (truthy(sv[a], st[a])) { pc += d; if (d < 0) tick(); } break; }
+      case OP.CALL: { tick(); const fi = code[pc++]; pc = enter(fi, pc); break; }
       case OP.RET: {
         const r = pop(); const v = sv[r], t = st[r];
         const f = frames.pop();
@@ -249,6 +250,7 @@ function exec(ctx, fnIndex, args) {
         push(v, t); pc = f.retPc; break;
       }
       case OP.NATIVE: {
+        tick();
         const id = code[pc++], argc = code[pc++];
         if (id >= NATIVES.length) throw new GlowRuntimeError('bad native');
         if (sp - argc < frames[frames.length - 1].base) throw new GlowRuntimeError('stack underflow');

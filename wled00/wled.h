@@ -1,5 +1,9 @@
 #ifndef WLED_H
 #define WLED_H
+
+#ifdef ESP8266
+  #error "WLED Studio targets the ESP32 family only (ESP8266 has too little flash/RAM for the Glow engine and Studio UI). Use upstream WLED for ESP8266."
+#endif
 /*
    Main sketch, global variable declarations
    @title WLED project sketch

@@ -30,11 +30,17 @@ struct Image {
   uint16_t metaLen = 0;
   const uint8_t *code = nullptr;
   uint16_t codeLen = 0;
+  uint16_t maxFrame = 0;            // max (locals + operand stack) of any function, from verify()
 
   enum Flags : uint8_t { F_PIXEL = 1, F_2D = 2, F_FRAME = 4, F_PALETTE = 8, F_AUDIO = 16 };
   // Validates header and section bounds. Returns nullptr on success or an error message.
   const char *load(const uint8_t *data, size_t len);
   Func func(uint8_t i) const;
+private:
+  // Checks every instruction: operands in range, jumps land on instruction starts inside
+  // their function, consistent stack depth at merge points, no underflow, no fall-through.
+  // After this the interpreter can skip per-instruction bounds checks.
+  const char *verify();
 };
 
 // What the script can see of the outside world. Implemented by the WLED glue
@@ -71,7 +77,8 @@ static const int MAX_ARRAYS = 16;
 static const int MAX_ARRAY_LEN = 4096;
 static const int STACK_SIZE = 256;
 static const int MAX_FRAMES = 32;
-static const uint32_t DEFAULT_BUDGET = 200000;
+// Budget is counted in loop iterations (backward jumps), calls and built-in calls per frame.
+static const uint32_t DEFAULT_BUDGET = 60000;
 
 enum Error : uint8_t {
   E_OK = 0, E_BUDGET, E_STACK, E_TYPE, E_BAD_CODE, E_PIXEL_RETURN, E_DRAW_IN_PIXEL, E_ARRAYS, E_MEMORY,
@@ -107,7 +114,7 @@ private:
   uint32_t budget_ = 0;
   uint32_t measured_ = 0;
 
-  bool exec(uint8_t fn, const Value *args, uint8_t nargs, Value &result);
+  bool exec(uint8_t fn, const Value *args, uint8_t nargs, Value &result);  // image must be verified
   bool native(uint8_t id, Value *a, uint8_t argc, Value &out);
   bool fail(uint8_t e, const char *detail = "");
   bool allocArray(uint8_t tag, uint16_t n, Value &out, uint32_t **data);

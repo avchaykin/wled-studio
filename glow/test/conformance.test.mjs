@@ -94,3 +94,18 @@ test('C++ VM matches the JS reference VM', { skip: !haveCxx && 'no C++ compiler'
 test('wled00/glow_natives.h is up to date', () => {
   execFileSync(process.execPath, [join(here, '..', 'tools', 'gen-natives.mjs'), '--check']);
 });
+
+test('verifier: corrupted images never crash the C++ VM (ASan/UBSan)', { skip: !haveCxx && 'no C++ compiler' }, () => {
+  const fuzz = join(work, 'fuzz');
+  try {
+    execFileSync(cxx, ['-std=c++17', '-O1', '-g', '-fsanitize=address,undefined', '-fno-sanitize-recover=all', '-o', fuzz,
+      join(here, 'native', 'fuzz.cpp'), join(root, 'wled00', 'glow_vm.cpp')], { stdio: 'pipe' });
+  } catch { return; } // toolchain without sanitizers: covered by the conformance test above
+  const seeds = readdirSync(join(here, '..', 'examples')).filter(f => f.endsWith('.glow')).map(f => {
+    const out = join(work, `seed-${f}.glw`);
+    writeFileSync(out, compile(readFileSync(join(here, '..', 'examples', f), 'utf8')).image);
+    return out;
+  });
+  const out = execFileSync(fuzz, seeds, { encoding: 'utf8' });
+  assert.match(out, /loaded \d+, rejected \d+, ran \d+/);
+});

@@ -8,6 +8,7 @@
   #pragma GCC optimize("O2")
 #endif
 #include <math.h>
+#include <stdlib.h>
 #include <string.h>
 
 namespace glow {
@@ -29,11 +30,13 @@ const char *Image::load(const uint8_t *data, size_t len) {
   if (nGlobals > 64) return "too many globals";
   size_t p = 20;
   consts = data + p; p += (size_t)nConsts * 5;
-  for (uint8_t i = 0; i < nStrings; i++) { if (p >= len) return "truncated strings"; p += 1 + data[p]; }
+  if (p > len) return "truncated constants";
+  for (uint8_t i = 0; i < nStrings; i++) { if (p >= len || p + 1 + data[p] > len) return "truncated strings"; p += 1 + data[p]; }
   funcs = data + p; p += (size_t)nFuncs * 4;
   meta = (const char *)(data + p); p += metaLen;
   code = data + p; p += codeLen;
   if (p != len) return "image size mismatch";
+  if (codeLen == 0) return "no code";
   for (uint8_t i = 0; i < nConsts; i++) if (consts[i * 5] > T_STR) return "bad constant";
   for (uint8_t i = 0; i < nFuncs; i++) {
     Func f = func(i);
@@ -42,7 +45,110 @@ const char *Image::load(const uint8_t *data, size_t len) {
   if (initFn != 255 && initFn >= nFuncs) return "bad init function";
   if (mainFn != 255 && mainFn >= nFuncs) return "bad main function";
   if (kind == K_EFFECT && mainFn == 255) return "effect has no main function";
-  return nullptr;
+  if (initFn != 255 && func(initFn).nargs != 0) return "init function takes arguments";
+  if (mainFn != 255) {
+    uint8_t want = (flags & F_PIXEL) ? ((flags & F_2D) ? 2 : 1) : 0;
+    if (func(mainFn).nargs != want) return "main function has wrong arity";
+  }
+  return verify();
+}
+
+// operand bytes per opcode (0xff = invalid opcode)
+static uint8_t opLen(uint8_t op) {
+  switch (op) {
+    case OP_HALT: case OP_PUSHT: case OP_PUSHF: case OP_POP: case OP_DUP: case OP_RET:
+    case OP_ADD: case OP_SUB: case OP_MUL: case OP_DIV: case OP_MOD: case OP_NEG: case OP_NOT:
+    case OP_EQ: case OP_NE: case OP_LT: case OP_LE: case OP_GT: case OP_GE: case OP_AGET: case OP_ASET: return 0;
+    case OP_PUSHK: case OP_PUSHI: case OP_LOADL: case OP_STOREL: case OP_LOADG: case OP_STOREG:
+    case OP_LOADB: case OP_LOADC: case OP_CALL: case OP_PUSHS: case OP_ARRLIT: return 1;
+    case OP_JMP: case OP_JZ: case OP_JNZ: case OP_NATIVE: return 2;
+    default: return 0xff;
+  }
+}
+
+const char *Image::verify() {
+  // instruction starts (bitmap) and per-pc stack depth (-1 = unvisited)
+  uint8_t *start = (uint8_t *)calloc((codeLen + 7) / 8, 1);
+  int16_t *depth = (int16_t *)malloc(codeLen * sizeof(int16_t));
+  uint16_t *work = (uint16_t *)malloc(codeLen * sizeof(uint16_t));
+  const char *err = nullptr;
+  if (!start || !depth || !work) { err = "out of memory"; goto done; }
+  maxFrame = 0;
+  for (uint8_t fi = 0; fi < nFuncs && !err; fi++) {
+    Func f = func(fi);
+    uint32_t end = codeLen;
+    for (uint8_t j = 0; j < nFuncs; j++) { uint16_t o = func(j).off; if (o > f.off && o < end) end = o; if (j != fi && o == f.off) err = "functions share code"; }
+    if (err) break;
+    // pass 1: decode linearly, check operands, mark instruction starts
+    for (uint32_t pc = f.off; pc < end && !err;) {
+      uint8_t op = code[pc], n = opLen(op);
+      if (n == 0xff) { err = "invalid opcode"; break; }
+      if (pc + 1 + n > end) { err = "truncated instruction"; break; }
+      start[pc >> 3] |= 1 << (pc & 7);
+      uint8_t a = n ? code[pc + 1] : 0;
+      switch (op) {
+        case OP_PUSHK: if (a >= nConsts) err = "bad constant index"; break;
+        case OP_LOADL: case OP_STOREL: if (a >= f.nlocals) err = "bad local index"; break;
+        case OP_LOADG: case OP_STOREG: if (a >= nGlobals) err = "bad global index"; break;
+        case OP_LOADB: if (a >= B_COUNT) err = "bad builtin"; break;
+        case OP_LOADC: if (a > 7) err = "bad control"; break;
+        case OP_CALL: if (a >= nFuncs) err = "bad function index"; break;
+        case OP_PUSHS: if (a >= nStrings) err = "bad string index"; break;
+        case OP_NATIVE: if (a >= N_COUNT || code[pc + 2] < NATIVE_ARGC[a][0] || code[pc + 2] > NATIVE_ARGC[a][1]) err = "bad native call"; break;
+      }
+      pc += 1 + n;
+    }
+    if (err) break;
+    // pass 2: stack depth dataflow (depth counts values above the locals)
+    for (uint32_t pc = f.off; pc < end; pc++) depth[pc] = -1;
+    int wn = 0, maxDepth = 0;
+    depth[f.off] = 0; work[wn++] = f.off;
+    while (wn && !err) {
+      uint32_t pc = work[--wn];
+      int d = depth[pc];
+      uint8_t op = code[pc], a = opLen(op) ? code[pc + 1] : 0;
+      int pop = 0, push = 0; bool falls = true; int32_t target = -1;
+      switch (op) {
+        case OP_HALT: falls = false; break;
+        case OP_RET: pop = 1; falls = false; break;
+        case OP_PUSHK: case OP_PUSHI: case OP_PUSHT: case OP_PUSHF: case OP_LOADL: case OP_LOADG:
+        case OP_LOADB: case OP_LOADC: case OP_PUSHS: push = 1; break;
+        case OP_POP: case OP_STOREL: case OP_STOREG: pop = 1; break;
+        case OP_DUP: pop = 1; push = 2; break;
+        case OP_NEG: case OP_NOT: pop = 1; push = 1; break;
+        case OP_ADD: case OP_SUB: case OP_MUL: case OP_DIV: case OP_MOD:
+        case OP_EQ: case OP_NE: case OP_LT: case OP_LE: case OP_GT: case OP_GE: case OP_AGET: pop = 2; push = 1; break;
+        case OP_ASET: pop = 3; break;
+        case OP_CALL: pop = func(a).nargs; push = 1; break;
+        case OP_NATIVE: pop = code[pc + 2]; push = 1; break;
+        case OP_ARRLIT: pop = a; push = 1; break;
+        case OP_JMP: case OP_JZ: case OP_JNZ: {
+          pop = op == OP_JMP ? 0 : 1; falls = op != OP_JMP;
+          target = (int32_t)pc + 3 + (int16_t)rd16(code + pc + 1);
+          break;
+        }
+      }
+      if (d < pop) { err = "stack underflow"; break; }
+      int nd = d - pop + push;
+      if (nd > maxDepth) maxDepth = nd;
+      uint32_t next = pc + 1 + opLen(op);
+      uint32_t succ[2]; int ns = 0;
+      if (falls) { if (next >= end) { err = "falls off end of function"; break; } succ[ns++] = next; }
+      if (target >= 0 || op == OP_JMP || op == OP_JZ || op == OP_JNZ) {
+        if (target < (int32_t)f.off || target >= (int32_t)end || !(start[target >> 3] & (1 << (target & 7)))) { err = "bad jump target"; break; }
+        succ[ns++] = (uint32_t)target;
+      }
+      for (int k = 0; k < ns; k++) {
+        if (depth[succ[k]] < 0) { depth[succ[k]] = nd; work[wn++] = succ[k]; }
+        else if (depth[succ[k]] != nd) { err = "inconsistent stack depth"; break; }
+      }
+    }
+    if (!err && f.nlocals + maxDepth > maxFrame) maxFrame = f.nlocals + maxDepth;
+  }
+  if (!err && maxFrame + 2 > STACK_SIZE / 2) err = "function needs too much stack";
+done:
+  free(start); free(depth); free(work);
+  return err;
 }
 
 Func Image::func(uint8_t i) const {
@@ -70,12 +176,28 @@ const char *errorText(uint8_t e) {
 }
 
 // ---------------- colour maths (match vm.mjs) ----------------
-static inline uint8_t clamp8(float v) { return v <= 0.0f ? 0 : v >= 255.0f ? 255 : (uint8_t)floorf(v + 0.5f); }
+static inline uint8_t clamp8(float v) { return !(v > 0.0f) ? 0 : v >= 255.0f ? 255 : (uint8_t)floorf(v + 0.5f); }  // NaN -> 0
 static inline uint8_t CR(uint32_t c) { return (c >> 16) & 255; }
 static inline uint8_t CG(uint32_t c) { return (c >> 8) & 255; }
 static inline uint8_t CB(uint32_t c) { return c & 255; }
 static inline uint8_t CW(uint32_t c) { return (c >> 24) & 255; }
 static inline float fract(float x) { return x - floorf(x); }
+// float -> int without undefined behaviour.
+// toI32: JavaScript ToInt32 semantics (wraps), used where the JS VM applies bitwise ops.
+static inline int32_t toI32(float x) {
+  if (!(x == x) || x > 3.4e38f || x < -3.4e38f) return 0;  // NaN, +-inf
+  float fl = floorf(x);
+  if (fl >= -2147483648.0f && fl < 2147483648.0f) return (int32_t)fl;
+  double d = fmod((double)fl, 4294967296.0);
+  if (d < 0) d += 4294967296.0;
+  return (int32_t)(uint32_t)d;
+}
+// toIndex: floor for pixel/array/slot indices; NaN, inf and |x| >= 1e9 map to a value that is
+// out of range for every index check and safe to add small offsets to.
+static inline int toIndex(float x) {
+  if (!(x > -1e9f && x < 1e9f)) return -(1 << 30);
+  return (int)floorf(x);
+}
 static inline uint8_t sat(int v) { return v < 0 ? 0 : v > 255 ? 255 : v; }
 
 uint32_t pack(float r, float g, float b, float w) {
@@ -101,7 +223,8 @@ uint32_t hsv(float h, float s, float v) {
   h = fract(h / 256.0f) * 6.0f;
   s = s / 255.0f; s = s < 0 ? 0 : s > 1 ? 1 : s;
   v = v < 0 ? 0 : v > 255 ? 255 : v;
-  int i = (int)floorf(h); float f = h - i;
+  if (!(h >= 0 && h < 6)) h = 0;  // NaN/inf input
+  int i = (int)h; float f = h - i;
   float p = v * (1 - s), q = v * (1 - s * f), t = v * (1 - s * (1 - f));
   switch (i % 6) {
     case 0: return pack(v, t, p); case 1: return pack(q, v, p); case 2: return pack(p, v, t);
@@ -120,7 +243,7 @@ static inline float grad(int h, float x, float y, float z) {
 }
 float noise3(float x, float y, float z) {
   float fx = floorf(x), fy = floorf(y), fz = floorf(z);
-  int X = (int)fx & 255, Y = (int)fy & 255, Z = (int)fz & 255;
+  int X = toI32(fx) & 255, Y = toI32(fy) & 255, Z = toI32(fz) & 255;
   x -= fx; y -= fy; z -= fz;
   float u = nfade(x), v = nfade(y), w = nfade(z);
   int A = P(X) + Y, AA = P(A) + Z, AB = P(A + 1) + Z, B = P(X + 1) + Y, BA = P(B) + Z, BB = P(B + 1) + Z;
@@ -169,7 +292,8 @@ bool VM::allocArray(uint8_t tag, uint16_t n, Value &out, uint32_t **data) {
 }
 
 void VM::setAA(float pos, uint32_t c, bool additive) {
-  float fi = floorf(pos); int i0 = (int)fi; float f = pos - fi;
+  int i0 = toIndex(pos); float f = pos - floorf(pos);
+  if (!(f >= 0 && f < 1)) f = 0;
   auto put = [&](int i, float weight) {
     if (i < 0 || i >= host_->len || weight <= 0) return;
     uint32_t cur = host_->getPixel(i);
@@ -246,199 +370,185 @@ bool VM::runFrame(const Image &img, Host &host, uint8_t *state, size_t stateSize
 }
 
 bool VM::exec(uint8_t fn, const Value *args, uint8_t nargs, Value &result) {
+  // The image passed Image::verify(): operands, jump targets and stack depths are valid,
+  // so only dynamic properties (types, array indices, call depth, budget) are checked here.
   const Image &img = *img_;
   const uint8_t *code = img.code;
-  const uint16_t codeLen = img.codeLen;
-  int sp = 0, fp = 0;
-  int32_t pc;
+  Value *const stack = stack_;
+  int sp = 0, fp = 0, base = 0;
+  const uint8_t *ip;
 
-  for (int k = 0; k < nargs; k++) stack_[sp++] = args[k];
+  for (int k = 0; k < nargs; k++) stack[sp++] = args[k];
 
-  #define FAIL(e, d) return fail(e, d)
-  #define NEED(n) do { if (pc + (n) > codeLen) FAIL(E_BAD_CODE, "truncated"); } while (0)
-  #define BASE (frames_[fp - 1].base)
-  #define POP() (sp > BASE ? &stack_[--sp] : nullptr)
-  #define PUSH(v) do { if (sp >= STACK_SIZE) FAIL(E_STACK, ""); stack_[sp++] = (v); } while (0)
-
-  auto enter = [&](uint8_t fi, int32_t retPc) -> int32_t {
-    if (fi >= img.nFuncs) { fail(E_BAD_CODE, "bad function"); return -1; }
-    if (fp >= MAX_FRAMES) { fail(E_STACK, "call depth"); return -1; }
+  auto enter = [&](uint8_t fi, const uint8_t *ret) -> const uint8_t * {
+    if (fp >= MAX_FRAMES || sp + img.maxFrame > STACK_SIZE) { fail(E_STACK, "call depth"); return nullptr; }
     Func f = img.func(fi);
-    int base = sp - f.nargs;
-    if (base < (fp ? frames_[fp - 1].base : 0) || base + f.nlocals + 16 > STACK_SIZE) { fail(E_STACK, ""); return -1; }
-    for (int k = f.nargs; k < f.nlocals; k++) stack_[base + k] = mkNum(0);
-    sp = base + f.nlocals;
-    frames_[fp].base = base; frames_[fp].retPc = retPc; fp++;
-    return f.off;
+    int b = sp - f.nargs;
+    for (int k = f.nargs; k < f.nlocals; k++) stack[b + k] = mkNum(0);
+    sp = b + f.nlocals;
+    frames_[fp].base = (uint16_t)b; frames_[fp].retPc = (int32_t)(ret ? ret - code : -1); fp++;
+    base = b;
+    return code + f.off;
   };
+  #define TICK() do { if (budget_-- == 0) return fail(E_BUDGET, ""); } while (0)
+  #define TYPEFAIL(d) return fail(E_TYPE, d)
 
-  pc = enter(fn, -1);
-  if (pc < 0) return false;
+  if (!(ip = enter(fn, nullptr))) return false;
 
-  for (;;) {
-    if (budget_-- == 0) FAIL(E_BUDGET, "");
-    if (pc < 0 || pc >= codeLen) FAIL(E_BAD_CODE, "pc out of range");
-    uint8_t op = code[pc++];
-    switch (op) {
-      case OP_HALT: result = mkNum(0); return true;
-      case OP_PUSHK: {
-        NEED(1); uint8_t k = code[pc++];
-        if (k >= img.nConsts) FAIL(E_BAD_CODE, "bad const");
-        const uint8_t *c = img.consts + k * 5;
-        Value v; v.u = rd32(c + 1); v.tag = c[0];
-        PUSH(v); break;
-      }
-      case OP_PUSHI: { NEED(1); PUSH(mkNum((int8_t)code[pc++])); break; }
-      case OP_PUSHT: PUSH(mkBool(true)); break;
-      case OP_PUSHF: PUSH(mkBool(false)); break;
-      case OP_POP: if (!POP()) FAIL(E_STACK, "underflow"); break;
-      case OP_DUP: { if (sp <= BASE) FAIL(E_STACK, "underflow"); Value v = stack_[sp - 1]; PUSH(v); break; }
-      case OP_LOADL: { NEED(1); int k = BASE + code[pc++]; if (k >= sp) FAIL(E_BAD_CODE, "bad local"); Value v = stack_[k]; PUSH(v); break; }
-      case OP_STOREL: {
-        NEED(1); int k = BASE + code[pc++]; Value *v = POP();
-        if (!v || k >= sp) FAIL(E_BAD_CODE, "bad local");
-        stack_[k] = *v; break;
-      }
-      case OP_LOADG: { NEED(1); uint8_t g = code[pc++]; if (g >= img.nGlobals) FAIL(E_BAD_CODE, "bad global"); PUSH(globals_[g]); break; }
-      case OP_STOREG: {
-        NEED(1); uint8_t g = code[pc++]; Value *v = POP();
-        if (!v || g >= img.nGlobals) FAIL(E_BAD_CODE, "bad global");
-        globals_[g] = *v; break;
-      }
-      case OP_LOADB: {
-        NEED(1); uint8_t b = code[pc++]; Value v;
-        switch (b) {
-          case B_T: v = mkNum((float)host_->t); break;
-          case B_FRAME: v = mkNum((float)st_->frame); break;
-          case B_LEN: v = mkNum(host_->len); break;
-          case B_W: v = mkNum(host_->w); break;
-          case B_H: v = mkNum(host_->h); break;
-          case B_AUDIO_VOL: v = mkNum(host_->audioVol); break;
-          case B_AUDIO_PEAK: v = mkBool(host_->audioPeak); break;
-          case B_AUDIO_BEAT: v = mkBool(host_->audioBeat); break;
-          case B_AUDIO_FREQ: v = mkNum(host_->audioFreq); break;
-          default: FAIL(E_BAD_CODE, "bad builtin");
-        }
-        PUSH(v); break;
-      }
-      case OP_LOADC: {
-        NEED(1); uint8_t c = code[pc++];
-        if (c > 7) FAIL(E_BAD_CODE, "bad control");
-        PUSH(c < 5 ? mkNum(host_->controls[c]) : mkBool(host_->controls[c] != 0));
-        break;
-      }
-      case OP_ADD: case OP_SUB: case OP_MUL: case OP_DIV: case OP_MOD: {
-        Value *b = POP(); Value *a = POP();
-        if (!a || !b) FAIL(E_STACK, "underflow");
-        Value r;
-        if (a->tag == T_COLOR || b->tag == T_COLOR) {
-          if (op == OP_ADD && a->tag == T_COLOR && b->tag == T_COLOR) r = mkCol(addColor(a->u, b->u));
-          else if (op == OP_SUB && a->tag == T_COLOR && b->tag == T_COLOR) r = mkCol(subColor(a->u, b->u));
-          else if (op == OP_MUL && a->tag == T_COLOR && isNum(*b)) r = mkCol(scaleColor(a->u, b->f));
-          else if (op == OP_MUL && b->tag == T_COLOR && isNum(*a)) r = mkCol(scaleColor(b->u, a->f));
-          else if (op == OP_DIV && a->tag == T_COLOR && isNum(*b)) r = mkCol(b->f == 0 ? 0 : scaleColor(a->u, 1.0f / b->f));
-          else FAIL(E_TYPE, "colour arithmetic");
-        } else {
-          if (!isNum(*a) || !isNum(*b)) FAIL(E_TYPE, "expected numbers");
-          float x = a->f, y = b->f;
-          switch (op) {
-            case OP_ADD: r = mkNum(x + y); break;
-            case OP_SUB: r = mkNum(x - y); break;
-            case OP_MUL: r = mkNum(x * y); break;
-            case OP_DIV: r = mkNum(y == 0 ? 0 : x / y); break;
-            default: r = mkNum(y == 0 ? 0 : x - y * floorf(x / y)); break;
-          }
-        }
-        stack_[sp++] = r; break;
-      }
-      case OP_NEG: { Value *a = POP(); if (!a || !isNum(*a)) FAIL(E_TYPE, "expected number"); stack_[sp++] = mkNum(-a->f); break; }
-      case OP_NOT: { Value *a = POP(); if (!a) FAIL(E_STACK, "underflow"); stack_[sp++] = mkBool(!truthy(*a)); break; }
-      case OP_EQ: case OP_NE: {
-        Value *b = POP(); Value *a = POP();
-        if (!a || !b) FAIL(E_STACK, "underflow");
-        bool eq;
-        if (a->tag == T_COLOR || b->tag == T_COLOR) eq = a->tag == b->tag && a->u == b->u;
-        else if (isNum(*a) && isNum(*b)) eq = a->f == b->f;
-        else FAIL(E_TYPE, "cannot compare");
-        stack_[sp++] = mkBool((op == OP_EQ) == eq); break;
-      }
-      case OP_LT: case OP_LE: case OP_GT: case OP_GE: {
-        Value *b = POP(); Value *a = POP();
-        if (!a || !b) FAIL(E_STACK, "underflow");
-        if (!isNum(*a) || !isNum(*b)) FAIL(E_TYPE, "expected numbers");
-        float x = a->f, y = b->f;
-        bool r = op == OP_LT ? x < y : op == OP_LE ? x <= y : op == OP_GT ? x > y : x >= y;
-        stack_[sp++] = mkBool(r); break;
-      }
-      case OP_JMP: { NEED(2); int16_t d = (int16_t)rd16(code + pc); pc += 2 + d; break; }
-      case OP_JZ: case OP_JNZ: {
-        NEED(2); int16_t d = (int16_t)rd16(code + pc); pc += 2;
-        Value *a = POP(); if (!a) FAIL(E_STACK, "underflow");
-        if (truthy(*a) == (op == OP_JNZ)) pc += d;
-        break;
-      }
-      case OP_CALL: { NEED(1); uint8_t fi = code[pc++]; pc = enter(fi, pc); if (pc < 0) return false; break; }
-      case OP_RET: {
-        Value *r = POP(); if (!r) FAIL(E_STACK, "underflow");
-        Value v = *r;
-        fp--;
-        sp = frames_[fp].base;
-        if (fp == 0) { result = v; return true; }
-        pc = frames_[fp].retPc;
-        stack_[sp++] = v; break;
-      }
-      case OP_NATIVE: {
-        NEED(2); uint8_t id = code[pc++], argc = code[pc++];
-        if (id >= N_COUNT || argc < NATIVE_ARGC[id][0] || argc > NATIVE_ARGC[id][1]) FAIL(E_BAD_CODE, "bad native");
-        if (sp - argc < BASE) FAIL(E_STACK, "underflow");
-        if (pixelMode_ && NATIVE_DRAWS[id]) FAIL(E_DRAW_IN_PIXEL, "");
-        sp -= argc;
-        Value out;
-        if (!native(id, &stack_[sp], argc, out)) return false;
-        stack_[sp++] = out; break;
-      }
-      case OP_AGET: case OP_ASET: {
-        Value *v = nullptr;
-        if (op == OP_ASET) { v = POP(); if (!v) FAIL(E_STACK, "underflow"); }
-        Value *ib = POP(); Value *ab = POP();
-        if (!ib || !ab) FAIL(E_STACK, "underflow");
-        if (ab->tag != T_ARRAY || ab->u >= st_->nArrays) FAIL(E_TYPE, "expected an array");
-        if (!isNum(*ib)) FAIL(E_TYPE, "array index must be a number");
-        if (measuring_) { if (op == OP_AGET) stack_[sp++] = mkNum(0); break; }
-        const ArrayRef &a = arrays_[ab->u];
-        int i = (int)floorf(ib->f);
-        uint32_t *data = (uint32_t *)(arena_ + a.off);
-        if (op == OP_AGET) {
-          Value r; r.tag = a.tag; r.u = (i >= 0 && i < a.size) ? data[i] : 0;
-          stack_[sp++] = r;
-        } else {
-          if (a.tag == T_COLOR ? v->tag != T_COLOR : !isNum(*v)) FAIL(E_TYPE, "wrong array element type");
-          if (i >= 0 && i < a.size) data[i] = v->u;
-        }
-        break;
-      }
-      case OP_ARRLIT: {
-        NEED(1); uint8_t n = code[pc++];
-        if (sp - n < BASE) FAIL(E_STACK, "underflow");
-        sp -= n;
-        uint8_t tag = (n && stack_[sp].tag == T_COLOR) ? T_COLOR : T_NUM;
-        Value out; uint32_t *data;
-        if (!allocArray(tag, n, out, &data)) return false;
-        for (int k = 0; k < n; k++) {
-          const Value &e = stack_[sp + k];
-          if (tag == T_COLOR ? e.tag != T_COLOR : !isNum(e)) FAIL(E_TYPE, "mixed array literal");
-          if (data) data[k] = e.u;
-        }
-        stack_[sp++] = out; break;
-      }
-      default: FAIL(E_BAD_CODE, "bad opcode");
+#if defined(__GNUC__)
+  // the verifier rejects unknown opcodes, so the table only covers OP_HALT..OP_ARRLIT
+  static_assert(OP_ARRLIT == 35, "update the dispatch table when adding opcodes");
+  static const void *const table[36] = {
+    #define L(x) &&L_##x
+    L(HALT), L(PUSHK), L(PUSHI), L(PUSHT), L(PUSHF), L(POP), L(DUP), L(LOADL), L(STOREL), L(LOADG), L(STOREG),
+    L(LOADB), L(LOADC), L(ADD), L(SUB), L(MUL), L(DIV), L(MOD), L(NEG), L(NOT), L(EQ), L(NE), L(LT), L(LE),
+    L(GT), L(GE), L(JMP), L(JZ), L(JNZ), L(CALL), L(RET), L(NATIVE), L(AGET), L(ASET), L(PUSHS), L(ARRLIT),
+    #undef L
+  };
+  #define CASE(x) L_##x:
+  #define NEXT() goto *table[*ip++]
+  NEXT();
+#else
+  #define CASE(x) case OP_##x:
+  #define NEXT() goto dispatch
+  dispatch:
+  switch (*ip++) {
+#endif
+
+  CASE(HALT) result = mkNum(0); return true;
+  CASE(PUSHK) { const uint8_t *c = img.consts + *ip++ * 5; Value v; v.u = rd32(c + 1); v.tag = c[0]; stack[sp++] = v; NEXT(); }
+  CASE(PUSHI) stack[sp++] = mkNum((int8_t)*ip++); NEXT();
+  CASE(PUSHT) stack[sp++] = mkBool(true); NEXT();
+  CASE(PUSHF) stack[sp++] = mkBool(false); NEXT();
+  CASE(POP) sp--; NEXT();
+  CASE(DUP) stack[sp] = stack[sp - 1]; sp++; NEXT();
+  CASE(LOADL) stack[sp++] = stack[base + *ip++]; NEXT();
+  CASE(STOREL) stack[base + *ip++] = stack[--sp]; NEXT();
+  CASE(LOADG) stack[sp++] = globals_[*ip++]; NEXT();
+  CASE(STOREG) globals_[*ip++] = stack[--sp]; NEXT();
+  CASE(LOADB) {
+    Value v;
+    switch (*ip++) {
+      case B_T: v = mkNum((float)host_->t); break;
+      case B_FRAME: v = mkNum((float)st_->frame); break;
+      case B_LEN: v = mkNum(host_->len); break;
+      case B_W: v = mkNum(host_->w); break;
+      case B_H: v = mkNum(host_->h); break;
+      case B_AUDIO_VOL: v = mkNum(host_->audioVol); break;
+      case B_AUDIO_PEAK: v = mkBool(host_->audioPeak); break;
+      case B_AUDIO_BEAT: v = mkBool(host_->audioBeat); break;
+      case B_AUDIO_FREQ: v = mkNum(host_->audioFreq); break;
+      default: return fail(E_BAD_CODE, "bad builtin");
     }
+    stack[sp++] = v; NEXT();
   }
-  #undef FAIL
-  #undef NEED
-  #undef BASE
-  #undef POP
-  #undef PUSH
+  CASE(LOADC) { uint8_t c = *ip++; stack[sp++] = c < 5 ? mkNum(host_->controls[c]) : mkBool(host_->controls[c] != 0); NEXT(); }
+  CASE(ADD) CASE(SUB) CASE(MUL) CASE(DIV) CASE(MOD) {
+    uint8_t op = ip[-1];
+    Value *a = &stack[sp - 2], *b = &stack[sp - 1];
+    Value r;
+    if (isNum(*a) && isNum(*b)) {           // fast path: plain numbers
+      float x = a->f, y = b->f;
+      switch (op) {
+        case OP_ADD: r = mkNum(x + y); break;
+        case OP_SUB: r = mkNum(x - y); break;
+        case OP_MUL: r = mkNum(x * y); break;
+        case OP_DIV: r = mkNum(y == 0 ? 0 : x / y); break;
+        default: r = mkNum(y == 0 ? 0 : x - y * floorf(x / y)); break;
+      }
+    } else if (a->tag == T_COLOR || b->tag == T_COLOR) {
+      if (op == OP_ADD && a->tag == T_COLOR && b->tag == T_COLOR) r = mkCol(addColor(a->u, b->u));
+      else if (op == OP_SUB && a->tag == T_COLOR && b->tag == T_COLOR) r = mkCol(subColor(a->u, b->u));
+      else if (op == OP_MUL && a->tag == T_COLOR && isNum(*b)) r = mkCol(scaleColor(a->u, b->f));
+      else if (op == OP_MUL && b->tag == T_COLOR && isNum(*a)) r = mkCol(scaleColor(b->u, a->f));
+      else if (op == OP_DIV && a->tag == T_COLOR && isNum(*b)) r = mkCol(b->f == 0 ? 0 : scaleColor(a->u, 1.0f / b->f));
+      else TYPEFAIL("colour arithmetic");
+    } else TYPEFAIL("expected numbers");
+    stack[sp - 2] = r; sp--; NEXT();
+  }
+  CASE(NEG) { Value *a = &stack[sp - 1]; if (!isNum(*a)) TYPEFAIL("expected number"); *a = mkNum(-a->f); NEXT(); }
+  CASE(NOT) stack[sp - 1] = mkBool(!truthy(stack[sp - 1])); NEXT();
+  CASE(EQ) CASE(NE) {
+    Value *a = &stack[sp - 2], *b = &stack[sp - 1];
+    bool eq;
+    if (a->tag == T_COLOR || b->tag == T_COLOR) eq = a->tag == b->tag && a->u == b->u;
+    else if (isNum(*a) && isNum(*b)) eq = a->f == b->f;
+    else TYPEFAIL("cannot compare");
+    stack[sp - 2] = mkBool((ip[-1] == OP_EQ) == eq); sp--; NEXT();
+  }
+  CASE(LT) CASE(LE) CASE(GT) CASE(GE) {
+    uint8_t op = ip[-1];
+    Value *a = &stack[sp - 2], *b = &stack[sp - 1];
+    if (!isNum(*a) || !isNum(*b)) TYPEFAIL("expected numbers");
+    float x = a->f, y = b->f;
+    stack[sp - 2] = mkBool(op == OP_LT ? x < y : op == OP_LE ? x <= y : op == OP_GT ? x > y : x >= y); sp--; NEXT();
+  }
+  CASE(JMP) { int16_t d = (int16_t)rd16(ip); ip += 2 + d; if (d < 0) TICK(); NEXT(); }
+  CASE(JZ) CASE(JNZ) {
+    bool nz = ip[-1] == OP_JNZ;
+    int16_t d = (int16_t)rd16(ip); ip += 2;
+    if (truthy(stack[--sp]) == nz) { ip += d; if (d < 0) TICK(); }
+    NEXT();
+  }
+  CASE(CALL) { TICK(); uint8_t fi = *ip++; if (!(ip = enter(fi, ip))) return false; NEXT(); }
+  CASE(RET) {
+    Value v = stack[--sp];
+    fp--;
+    sp = frames_[fp].base;
+    if (fp == 0) { result = v; return true; }
+    base = frames_[fp - 1].base;
+    ip = code + frames_[fp].retPc;
+    stack[sp++] = v; NEXT();
+  }
+  CASE(NATIVE) {
+    TICK();
+    uint8_t id = ip[0], argc = ip[1]; ip += 2;
+    if (pixelMode_ && NATIVE_DRAWS[id]) return fail(E_DRAW_IN_PIXEL, "");
+    sp -= argc;
+    Value out;
+    if (!native(id, &stack[sp], argc, out)) return false;
+    stack[sp++] = out; NEXT();
+  }
+  CASE(AGET) CASE(ASET) {
+    bool set = ip[-1] == OP_ASET;
+    Value *v = set ? &stack[--sp] : nullptr;
+    Value *ib = &stack[--sp], *ab = &stack[--sp];
+    if (ab->tag != T_ARRAY || ab->u >= st_->nArrays) TYPEFAIL("expected an array");
+    if (!isNum(*ib)) TYPEFAIL("array index must be a number");
+    if (measuring_) { if (!set) stack[sp++] = mkNum(0); NEXT(); }
+    const ArrayRef &a = arrays_[ab->u];
+    int i = toIndex(ib->f);
+    uint32_t *data = (uint32_t *)(arena_ + a.off);
+    if (!set) { Value r; r.tag = a.tag; r.u = (i >= 0 && i < a.size) ? data[i] : 0; stack[sp++] = r; }
+    else {
+      if (a.tag == T_COLOR ? v->tag != T_COLOR : !isNum(*v)) TYPEFAIL("wrong array element type");
+      if (i >= 0 && i < a.size) data[i] = v->u;
+    }
+    NEXT();
+  }
+  CASE(PUSHS) { Value v; v.u = *ip++; v.tag = T_STR; stack[sp++] = v; NEXT(); }
+  CASE(ARRLIT) {
+    uint8_t n = *ip++;
+    sp -= n;
+    uint8_t tag = (n && stack[sp].tag == T_COLOR) ? T_COLOR : T_NUM;
+    Value out; uint32_t *data;
+    if (!allocArray(tag, n, out, &data)) return false;
+    for (int k = 0; k < n; k++) {
+      const Value &e = stack[sp + k];
+      if (tag == T_COLOR ? e.tag != T_COLOR : !isNum(e)) TYPEFAIL("mixed array literal");
+      if (data) data[k] = e.u;
+    }
+    stack[sp++] = out; NEXT();
+  }
+#if !defined(__GNUC__)
+  default:
+  }
+#endif
+  return fail(E_BAD_CODE, "bad opcode");
+  #undef CASE
+  #undef NEXT
+  #undef TICK
+  #undef TYPEFAIL
 }
 
 bool VM::native(uint8_t id, Value *a, uint8_t argc, Value &out) {
@@ -486,18 +596,18 @@ bool VM::native(uint8_t id, Value *a, uint8_t argc, Value &out) {
     case N_BEAT: RET_NUM(fract((float)h.t * NUM(0) / 60000.0f));
     case N_RGB: RET_COL(pack(NUM(0), NUM(1), NUM(2), argc > 3 ? NUM(3) : 0.0f));
     case N_HSV: RET_COL(hsv(NUM(0), NUM(1), NUM(2)));
-    case N_PAL: { float i = NUM(0); CHECK(); RET_COL(h.palette((uint8_t)((int)floorf(i) & 255))); }
+    case N_PAL: { float i = NUM(0); CHECK(); RET_COL(h.palette((uint8_t)(toI32(i) & 255))); }
     case N_BLEND: RET_COL(blendColor(COL(0), COL(1), NUM(2)));
     case N_BRIGHT: RET_COL(scaleColor(COL(0), NUM(1) / 255.0f));
     case N_R: RET_NUM(CR(COL(0)));
     case N_G: RET_NUM(CG(COL(0)));
     case N_B: RET_NUM(CB(COL(0)));
     case N_W: RET_NUM(CW(COL(0)));
-    case N_COLOR: { float k = NUM(0); CHECK(); int i = (int)floorf(k); RET_COL(i >= 0 && i < 3 ? h.colors[i] : 0); }
+    case N_COLOR: { float k = NUM(0); CHECK(); int i = toIndex(k); RET_COL(i >= 0 && i < 3 ? h.colors[i] : 0); }
     case N_SET: case N_ADD: {
       if (argc == 3) {
         float fx = NUM(0), fy = NUM(1); uint32_t c = COL(2); CHECK();
-        int x = (int)floorf(fx), y = (int)floorf(fy);
+        int x = toIndex(fx), y = toIndex(fy);
         if (x >= 0 && x < h.w && y >= 0 && y < h.h) h.setPixel(y * h.w + x, c);
         RET_NONE();
       }
@@ -508,10 +618,10 @@ bool VM::native(uint8_t id, Value *a, uint8_t argc, Value &out) {
     case N_GET: {
       if (argc == 2) {
         float fx = NUM(0), fy = NUM(1); CHECK();
-        int x = (int)floorf(fx), y = (int)floorf(fy);
+        int x = toIndex(fx), y = toIndex(fy);
         RET_COL(x >= 0 && x < h.w && y >= 0 && y < h.h ? h.getPixel(y * h.w + x) : 0);
       }
-      float fi = NUM(0); CHECK(); int i = (int)floorf(fi);
+      float fi = NUM(0); CHECK(); int i = toIndex(fi);
       RET_COL(i >= 0 && i < h.len ? h.getPixel(i) : 0);
     }
     case N_FILL: { uint32_t c = COL(0); CHECK(); for (int i = 0; i < h.len; i++) h.setPixel(i, c); RET_NONE(); }
@@ -538,14 +648,16 @@ bool VM::native(uint8_t id, Value *a, uint8_t argc, Value &out) {
     }
     case N_SHIFT: {
       float fn = NUM(0); CHECK();
-      int n = (int)truncf(fn), L = h.len;
+      int L = h.len;
+      float tn = truncf(fn);
+      int n = !(tn == tn) ? 0 : tn > L ? L : tn < -L ? -L : (int)tn;  // |n| >= len clears the strip
       if (n > 0) { for (int i = L - 1; i >= 0; i--) h.setPixel(i, i - n >= 0 ? h.getPixel(i - n) : 0); }
       else if (n < 0) { for (int i = 0; i < L; i++) h.setPixel(i, i - n < L ? h.getPixel(i - n) : 0); }
       RET_NONE();
     }
     case N_ARRAY: {
       float fn = NUM(0); CHECK();
-      int n = (int)floorf(fn); n = n < 1 ? 1 : n > MAX_ARRAY_LEN ? MAX_ARRAY_LEN : n;
+      int n = toIndex(fn); n = n < 1 ? 1 : n > MAX_ARRAY_LEN ? MAX_ARRAY_LEN : n;
       bool isCol = argc > 1 && a[1].tag == T_COLOR;
       if (argc > 1 && !isCol && !isNum(a[1])) return fail(E_TYPE, "array fill value");
       uint32_t *data;
@@ -558,7 +670,7 @@ bool VM::native(uint8_t id, Value *a, uint8_t argc, Value &out) {
       RET_NUM(measuring_ ? 0.0f : (float)arrays_[a[0].u].size);
     }
     case N_AUDIO_BAND: {
-      float k = NUM(0); CHECK(); int i = (int)floorf(k);
+      float k = NUM(0); CHECK(); int i = toIndex(k);
       RET_NUM(i >= 0 && i < 16 && h.audioBands ? h.audioBands[i] : 0.0f);
     }
     default: return fail(E_BAD_CODE, "native not implemented");

@@ -44,6 +44,7 @@ int main(int argc, char **argv) {
   for (int fr = 0; fr < frames; fr++) {
     h.t = fr * 25;
     if (!vm.runFrame(im, h, state.data(), state.size(), seed)) { printf("ERR %s %s\n", glow::errorText(vm.lastError), vm.lastDetail); return 1; }
+    if (getenv("GLOW_QUIET") && fr < frames - 1) continue; // benchmark mode: print only the last frame
     for (int i = 0; i < h.len; i++) printf(i ? " %08x" : "%08x", h.px[i]);
     printf("\n");
   }
