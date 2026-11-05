@@ -121,7 +121,6 @@ h3 { font-size: 11px; font-weight: 600; color: var(--tx2); text-transform: upper
 .filter { height: 24px; padding: 0 8px; border-radius: 4px; color: var(--tx3); }
 .filter:hover { color: var(--tx); background: var(--hover); }
 .filter[aria-pressed="true"] { color: var(--acc-tx); background: var(--acc-soft); }
-.lib-count { margin-left: auto; font-size: 11px; color: var(--tx3); }
 .lib-list { flex: 1; overflow: auto; padding: 6px 8px 16px; display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); align-content: start; gap: 1px 8px; }
 .lib-row { display: flex; align-items: center; border-radius: var(--r); }
 .lib-row:hover { background: var(--hover); }
