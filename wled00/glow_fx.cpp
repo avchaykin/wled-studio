@@ -419,9 +419,12 @@ static void glowReloadAll() {
     f.close();
   }
 
-  // discover images on the filesystem
+  // discover images on the filesystem: collect names first, then read headers with the
+  // directory closed (no file access while a directory iteration is open)
+  static char found[GLOW_SLOTS + GLOW_MAX_SHOWS][GLOW_NAME_LEN + 1];
+  int nFound = 0;
   File dir = WLED_FS.open(FPSTR(_glow_dir));
-  while (dir) {
+  while (dir && nFound < GLOW_SLOTS + GLOW_MAX_SHOWS) {
     File e = dir.openNextFile();
     if (!e) break;
     String n = e.name();
@@ -429,14 +432,17 @@ static void glowReloadAll() {
     int slash = n.lastIndexOf('/'); if (slash >= 0) n = n.substring(slash + 1);
     if (!n.endsWith(F(".glw"))) continue;
     n.remove(n.length() - 4);
-    if (!validName(n.c_str())) continue;
-    if (glowFileKind(n.c_str()) == glow::K_SHOW) { glowAddShowName(n.c_str()); continue; }
-    bool known = false;
-    for (int i = 0; i < GLOW_SLOTS; i++) if (!strcmp(wanted[i], n.c_str())) known = true;
-    if (known) continue;
-    for (int i = 0; i < GLOW_SLOTS; i++) if (!wanted[i][0]) { strlcpy(wanted[i], n.c_str(), sizeof(wanted[i])); break; }
+    if (validName(n.c_str())) strlcpy(found[nFound++], n.c_str(), GLOW_NAME_LEN + 1);
   }
-  dir.close();
+  if (dir) dir.close();
+  for (int k = 0; k < nFound; k++) {
+    const char *n = found[k];
+    if (glowFileKind(n) == glow::K_SHOW) { glowAddShowName(n); continue; }
+    bool known = false;
+    for (int i = 0; i < GLOW_SLOTS; i++) if (!strcmp(wanted[i], n)) known = true;
+    if (known) continue;
+    for (int i = 0; i < GLOW_SLOTS; i++) if (!wanted[i][0]) { strlcpy(wanted[i], n, sizeof(wanted[i])); break; }
+  }
 
   for (int i = 0; i < GLOW_SLOTS; i++) {
     if (!wanted[i][0] || !glowLoadFile(glowSlots[i], wanted[i])) glowUnload(glowSlots[i]);
