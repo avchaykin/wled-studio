@@ -860,8 +860,9 @@ void serializeInfo(JsonObject root)
   root[F("core")] = ESP.getSdkVersion();
   root[F("clock")] = ESP.getCpuFreqMHz();
   root[F("flash")] = (ESP.getFlashChipSize()/1024)/1024;
-  #ifdef WLED_DEBUG
+  root[F("reset")] = (int)esp_reset_reason(); // why the last boot happened (esp_reset_reason_t: 1 power-on, 3 software, 4 panic, 5-7 watchdog, 9 brownout)
   root[F("maxalloc")] = getContiguousFreeHeap();
+  #ifdef WLED_DEBUG
   root[F("resetReason0")] = (int)rtc_get_reset_reason(0);
   root[F("resetReason1")] = (int)rtc_get_reset_reason(1);
   #endif
