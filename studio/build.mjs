@@ -21,7 +21,8 @@ function genExamples() {
 export async function buildHtml({ dev = false } = {}) {
   genExamples();
   const js = await esbuild.build({
-    entryPoints: [join(dir, 'src', 'main.js')], bundle: true, format: 'iife', write: false,
+    entryPoints: [join(dir, 'src', 'main.jsx')], bundle: true, format: 'iife', write: false,
+    jsx: 'automatic', jsxImportSource: 'preact', define: { 'process.env.NODE_ENV': dev ? '"development"' : '"production"' },
     minify: !dev, sourcemap: dev ? 'inline' : false, target: ['es2020', 'safari14'], legalComments: 'none',
   });
   const css = await esbuild.build({ entryPoints: [join(dir, 'src', 'styles.css')], bundle: true, write: false, minify: !dev, loader: { '.css': 'css' } });

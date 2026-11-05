@@ -38,3 +38,7 @@ wled-update.sh
 # WLED Studio build output
 /studio/dist/
 /studio/src/examples.gen.js
+
+# design tooling scratch
+/.impeccable/review/
+/.impeccable/mocks/

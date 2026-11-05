@@ -1,0 +1,558 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-05T00:00:00Z",
+  "title": "Design System: WLED Studio",
+  "extensions": {
+    "colorMeta": {
+      "canvas": {
+        "role": "neutral",
+        "displayName": "Graphite Canvas",
+        "tonalRamp": [
+          "#08090a",
+          "#0e0f11",
+          "#15171a",
+          "#1c1f23",
+          "#23272c",
+          "#2a2e34",
+          "#3a3f46",
+          "#8a9099"
+        ]
+      },
+      "panel": {
+        "role": "neutral",
+        "displayName": "Graphite Panel",
+        "tonalRamp": [
+          "#08090a",
+          "#0e0f11",
+          "#15171a",
+          "#1c1f23",
+          "#23272c",
+          "#2a2e34",
+          "#3a3f46",
+          "#8a9099"
+        ]
+      },
+      "raised": {
+        "role": "neutral",
+        "displayName": "Graphite Raised",
+        "tonalRamp": [
+          "#08090a",
+          "#0e0f11",
+          "#15171a",
+          "#1c1f23",
+          "#23272c",
+          "#2a2e34",
+          "#3a3f46",
+          "#8a9099"
+        ]
+      },
+      "hover": {
+        "role": "neutral",
+        "displayName": "Graphite Hover",
+        "tonalRamp": [
+          "#08090a",
+          "#0e0f11",
+          "#15171a",
+          "#1c1f23",
+          "#23272c",
+          "#2a2e34",
+          "#3a3f46",
+          "#8a9099"
+        ]
+      },
+      "line": {
+        "role": "neutral",
+        "displayName": "Hairline",
+        "tonalRamp": [
+          "#08090a",
+          "#0e0f11",
+          "#15171a",
+          "#1c1f23",
+          "#23272c",
+          "#2a2e34",
+          "#3a3f46",
+          "#8a9099"
+        ]
+      },
+      "line-strong": {
+        "role": "neutral",
+        "displayName": "Strong Hairline",
+        "tonalRamp": [
+          "#08090a",
+          "#0e0f11",
+          "#15171a",
+          "#1c1f23",
+          "#23272c",
+          "#2a2e34",
+          "#3a3f46",
+          "#8a9099"
+        ]
+      },
+      "text": {
+        "role": "neutral",
+        "displayName": "Bright Graphite Text",
+        "tonalRamp": [
+          "#3a3f46",
+          "#5d636b",
+          "#8a9099",
+          "#a6acb4",
+          "#c4c8cd",
+          "#d6d9dd",
+          "#e6e8eb",
+          "#f4f5f6"
+        ]
+      },
+      "text-secondary": {
+        "role": "neutral",
+        "displayName": "Mid Graphite Text",
+        "tonalRamp": [
+          "#3a3f46",
+          "#5d636b",
+          "#8a9099",
+          "#a6acb4",
+          "#c4c8cd",
+          "#d6d9dd",
+          "#e6e8eb",
+          "#f4f5f6"
+        ]
+      },
+      "text-tertiary": {
+        "role": "neutral",
+        "displayName": "Quiet Graphite Text",
+        "tonalRamp": [
+          "#3a3f46",
+          "#5d636b",
+          "#8a9099",
+          "#a6acb4",
+          "#c4c8cd",
+          "#d6d9dd",
+          "#e6e8eb",
+          "#f4f5f6"
+        ]
+      },
+      "cobalt": {
+        "role": "primary",
+        "displayName": "Cobalt",
+        "tonalRamp": [
+          "#00174c",
+          "#002680",
+          "#0035b2",
+          "#0045e6",
+          "#2969ff",
+          "#6694ff",
+          "#a3bfff",
+          "#e0eaff"
+        ]
+      },
+      "cobalt-hover": {
+        "role": "primary",
+        "displayName": "Cobalt Hover",
+        "tonalRamp": [
+          "#00174c",
+          "#002680",
+          "#0035b2",
+          "#0045e6",
+          "#2969ff",
+          "#6694ff",
+          "#a3bfff",
+          "#e0eaff"
+        ]
+      },
+      "cobalt-text": {
+        "role": "primary",
+        "displayName": "Cobalt Text",
+        "tonalRamp": [
+          "#00174c",
+          "#002680",
+          "#0035b2",
+          "#0045e6",
+          "#2969ff",
+          "#6694ff",
+          "#a3bfff",
+          "#e0eaff"
+        ]
+      },
+      "cobalt-soft": {
+        "role": "primary",
+        "displayName": "Cobalt Wash",
+        "tonalRamp": [
+          "#00174c",
+          "#002680",
+          "#0035b2",
+          "#0045e6",
+          "#2969ff",
+          "#6694ff",
+          "#a3bfff",
+          "#e0eaff"
+        ],
+        "canonical": "rgb(91 140 255 / 0.14)"
+      },
+      "danger": {
+        "role": "status",
+        "displayName": "Signal Red",
+        "tonalRamp": [
+          "#470508",
+          "#76090d",
+          "#a60d12",
+          "#d51017",
+          "#f0383e",
+          "#f47175",
+          "#f8aaac",
+          "#fde3e3"
+        ]
+      },
+      "danger-text": {
+        "role": "status",
+        "displayName": "Signal Red Text",
+        "tonalRamp": [
+          "#470508",
+          "#76090d",
+          "#a60d12",
+          "#d51017",
+          "#f0383e",
+          "#f47175",
+          "#f8aaac",
+          "#fde3e3"
+        ]
+      },
+      "ok": {
+        "role": "status",
+        "displayName": "Signal Green",
+        "tonalRamp": [
+          "#0f3d29",
+          "#196644",
+          "#248f5f",
+          "#2eb87a",
+          "#53d49b",
+          "#84e1b7",
+          "#b5edd4",
+          "#e6f9f1"
+        ]
+      },
+      "white": {
+        "role": "neutral",
+        "displayName": "Knob White",
+        "tonalRamp": [
+          "#3a3f46",
+          "#5d636b",
+          "#8a9099",
+          "#a6acb4",
+          "#c4c8cd",
+          "#d6d9dd",
+          "#e6e8eb",
+          "#f4f5f6"
+        ]
+      }
+    },
+    "typographyMeta": {
+      "title": {
+        "displayName": "Title",
+        "purpose": "Page headings on Presets, Scripts, Settings."
+      },
+      "name": {
+        "displayName": "Name",
+        "purpose": "Editable segment name in the inspector."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "All controls and rows; 14px at <=860px."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Uppercase inspector section headers in text-secondary."
+      },
+      "caption": {
+        "displayName": "Caption",
+        "purpose": "Field labels, hints, counts, table headers, clip labels."
+      },
+      "micro": {
+        "displayName": "Micro",
+        "purpose": "Rail labels, ruler ticks, tags, cursor readout."
+      },
+      "mono": {
+        "displayName": "Mono",
+        "purpose": "Hex, IP, script source, gutter, compile status."
+      }
+    },
+    "shadows": [
+      {
+        "name": "popover",
+        "value": "0 12px 32px rgb(0 0 0 / .5), 0 2px 6px rgb(0 0 0 / .35)",
+        "purpose": "Pickers and colour picker."
+      },
+      {
+        "name": "dialog",
+        "value": "0 24px 64px rgb(0 0 0 / .6)",
+        "purpose": "Command palette; backdrop rgb(0 0 0 / .45)."
+      },
+      {
+        "name": "toast",
+        "value": "0 8px 24px rgb(0 0 0 / .5)",
+        "purpose": "Undo toast."
+      },
+      {
+        "name": "thumb",
+        "value": "0 1px 3px rgb(0 0 0 / .5)",
+        "purpose": "Slider thumbs and colour-picker dots."
+      },
+      {
+        "name": "tab-lift",
+        "value": "0 1px 2px rgb(0 0 0 / .4)",
+        "purpose": "Selected segmented tab."
+      },
+      {
+        "name": "content-ring",
+        "value": "inset 0 0 0 1px rgb(255 255 255 / .1)",
+        "purpose": "Edge of clips, swatches, swatch bars (.08-.28 by state)."
+      },
+      {
+        "name": "selection-ring",
+        "value": "inset 0 0 0 2px #5b8cff",
+        "purpose": "Selected clip; 0 0 0 2px for open swatch and focused edge."
+      },
+      {
+        "name": "focus-outline",
+        "value": "outline: 2px solid #5b8cff; outline-offset: 1px",
+        "purpose": "Global :focus-visible."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease",
+        "value": "cubic-bezier(.2, .8, .2, 1)",
+        "purpose": "The only easing."
+      },
+      {
+        "name": "fast",
+        "value": "120ms",
+        "purpose": "Edge handle reveal, thumb scale."
+      },
+      {
+        "name": "popover-in",
+        "value": "140ms",
+        "purpose": "Popover fade + 4px rise."
+      },
+      {
+        "name": "toggle",
+        "value": "150ms",
+        "purpose": "Switch knob and track."
+      },
+      {
+        "name": "toast-in",
+        "value": "180ms",
+        "purpose": "Toast rise."
+      },
+      {
+        "name": "status",
+        "value": "200ms",
+        "purpose": "Connection dot colour."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "none",
+        "purpose": "prefers-reduced-motion removes all animation and transition."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "compact-topbar",
+        "value": "1080px"
+      },
+      {
+        "name": "narrow",
+        "value": "860px"
+      },
+      {
+        "name": "touch",
+        "value": "(hover: none)"
+      }
+    ],
+    "controlSizes": {
+      "ctl": "28px (32px at <=860px)",
+      "inline-field": "24px",
+      "row": "30px (40px touch)",
+      "search-header": "36px",
+      "palette-search": "46px",
+      "table-row": "40px",
+      "topbar": "44px (48px narrow)",
+      "rail": "56px",
+      "inspector": "320px",
+      "lane": "64px"
+    },
+    "interaction": {
+      "echoGuardMs": 800,
+      "sendCadence": "at most one merged message per animation frame; wait a frame if ws.bufferedAmount > 2048; discrete actions flush immediately",
+      "undoDepth": 30,
+      "toastMs": 6000,
+      "shortcuts": {
+        "mod+K": "command palette",
+        "mod+Z": "undo structural edit",
+        "S": "split at hovered LED",
+        "[": "previous segment",
+        "]": "next segment",
+        "Delete/Backspace": "delete segment",
+        "P": "power",
+        "1-4": "pages",
+        "Shift (drag/arrows)": "snap/step 10"
+      }
+    }
+  },
+  "components": [
+    {
+      "name": "Button",
+      "kind": "button",
+      "refersTo": "button",
+      "description": "Default and ghost actions at 28px.",
+      "html": "<div class=\"ds-row\"><button class=\"ds-btn\">Apply</button><button class=\"ds-btn ds-ghost\">Language guide</button></div>",
+      "css": ":host{--canvas:#0e0f11;--panel:#15171a;--raised:#1c1f23;--hover:#23272c;--line:#2a2e34;--line-strong:#3a3f46;--tx:#e6e8eb;--tx2:#a6acb4;--tx3:#8a9099;--acc:#5b8cff;--acc-tx:#8fb0ff;--acc-soft:rgb(91 140 255 / .14);--r:6px;--ctl:28px;--font:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,Roboto,sans-serif;--mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;--ease:cubic-bezier(.2,.8,.2,1);font:13px/1.4 var(--font);color:var(--tx);font-variant-numeric:tabular-nums;} .ds-row{display:flex;gap:8px;padding:12px;background:var(--panel)} .ds-btn{display:inline-flex;align-items:center;gap:6px;height:var(--ctl);padding:0 10px;border:1px solid var(--line-strong);border-radius:var(--r);background:var(--raised);color:var(--tx);font:500 13px var(--font);cursor:pointer} .ds-btn:hover{background:var(--hover)} .ds-btn:focus-visible{outline:2px solid var(--acc);outline-offset:1px} .ds-ghost{border-color:transparent;background:none;color:var(--tx2)} .ds-ghost:hover{color:var(--tx);background:var(--hover)}"
+    },
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "The single commit action of a view, with its shortcut.",
+      "html": "<div class=\"ds-row\"><button class=\"ds-btn-primary\">Save to device <kbd class=\"ds-kbd\">⌘S</kbd></button></div>",
+      "css": ":host{--canvas:#0e0f11;--panel:#15171a;--raised:#1c1f23;--hover:#23272c;--line:#2a2e34;--line-strong:#3a3f46;--tx:#e6e8eb;--tx2:#a6acb4;--tx3:#8a9099;--acc:#5b8cff;--acc-tx:#8fb0ff;--acc-soft:rgb(91 140 255 / .14);--r:6px;--ctl:28px;--font:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,Roboto,sans-serif;--mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;--ease:cubic-bezier(.2,.8,.2,1);font:13px/1.4 var(--font);color:var(--tx);font-variant-numeric:tabular-nums;} .ds-row{padding:12px;background:var(--panel)} .ds-btn-primary{display:inline-flex;align-items:center;gap:6px;height:var(--ctl);padding:0 10px;border:1px solid var(--acc);border-radius:var(--r);background:var(--acc);color:#fff;font:500 13px var(--font);cursor:pointer} .ds-btn-primary:hover{background:#6b98ff} .ds-btn-primary:focus-visible{outline:2px solid var(--acc);outline-offset:1px} .ds-kbd{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 4px;border:1px solid rgb(255 255 255 / .25);border-radius:4px;font:11px var(--font);color:#fff;background:rgb(255 255 255 / .16)}"
+    },
+    {
+      "name": "Icon Button",
+      "kind": "button",
+      "refersTo": "icon-button",
+      "description": "28px square tool action with authored 16px stroke icon.",
+      "html": "<div class=\"ds-row\"><button class=\"ds-iconbtn\" aria-label=\"Split (S)\" title=\"Split (S)\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 16 16\" aria-hidden=\"true\"><path d=\"M8 1.75v12.5M5.25 5 2.75 8l2.5 3M10.75 5l2.5 3-2.5 3\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg></button></div>",
+      "css": ":host{--canvas:#0e0f11;--panel:#15171a;--raised:#1c1f23;--hover:#23272c;--line:#2a2e34;--line-strong:#3a3f46;--tx:#e6e8eb;--tx2:#a6acb4;--tx3:#8a9099;--acc:#5b8cff;--acc-tx:#8fb0ff;--acc-soft:rgb(91 140 255 / .14);--r:6px;--ctl:28px;--font:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,Roboto,sans-serif;--mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;--ease:cubic-bezier(.2,.8,.2,1);font:13px/1.4 var(--font);color:var(--tx);font-variant-numeric:tabular-nums;} .ds-row{padding:12px;background:var(--panel)} .ds-iconbtn{width:var(--ctl);height:var(--ctl);display:grid;place-items:center;border:0;border-radius:var(--r);background:none;color:var(--tx2);cursor:pointer} .ds-iconbtn:hover{background:var(--hover);color:var(--tx)} .ds-iconbtn:focus-visible{outline:2px solid var(--acc);outline-offset:1px}"
+    },
+    {
+      "name": "Slider Row",
+      "kind": "input",
+      "refersTo": "number-field",
+      "description": "Label, cobalt-filled track and recessed number field.",
+      "html": "<div class=\"ds-wrap\"><div class=\"ds-slider\"><span class=\"ds-lbl\">Speed</span><input type=\"range\" min=\"0\" max=\"255\" value=\"128\" style=\"--p:50%\"><span class=\"ds-num\"><input value=\"128\" inputmode=\"numeric\" aria-label=\"Speed value\"></span></div></div>",
+      "css": ":host{--canvas:#0e0f11;--panel:#15171a;--raised:#1c1f23;--hover:#23272c;--line:#2a2e34;--line-strong:#3a3f46;--tx:#e6e8eb;--tx2:#a6acb4;--tx3:#8a9099;--acc:#5b8cff;--acc-tx:#8fb0ff;--acc-soft:rgb(91 140 255 / .14);--r:6px;--ctl:28px;--font:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,Roboto,sans-serif;--mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;--ease:cubic-bezier(.2,.8,.2,1);font:13px/1.4 var(--font);color:var(--tx);font-variant-numeric:tabular-nums;} .ds-wrap{padding:12px 16px;background:var(--panel);width:288px} .ds-slider{display:grid;grid-template-columns:76px minmax(0,1fr) 44px;align-items:center;gap:8px} .ds-lbl{color:var(--tx2)} .ds-slider input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:20px;margin:0;background:none;cursor:pointer} .ds-slider input[type=range]::-webkit-slider-runnable-track{height:4px;border-radius:2px;background:linear-gradient(90deg,var(--acc) var(--p),var(--line-strong) var(--p))} .ds-slider input[type=range]::-moz-range-track{height:4px;border-radius:2px;background:linear-gradient(90deg,var(--acc) var(--p),var(--line-strong) var(--p))} .ds-slider input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:12px;height:12px;margin-top:-4px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgb(0 0 0 / .5);transition:transform .12s var(--ease)} .ds-slider input[type=range]:active::-webkit-slider-thumb{transform:scale(1.25)} .ds-slider input[type=range]:focus-visible{outline:none} .ds-slider input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 3px rgb(91 140 255 / .5)} .ds-num{display:inline-flex;width:44px;height:24px;border:1px solid transparent;border-radius:4px;background:var(--canvas)} .ds-num:hover{border-color:var(--line)} .ds-num:focus-within{border-color:var(--acc)} .ds-num input{width:100%;min-width:0;padding:0 4px;border:0;background:none;color:var(--tx);text-align:right;font:12px var(--font);font-variant-numeric:tabular-nums;outline:none}"
+    },
+    {
+      "name": "Switch",
+      "kind": "input",
+      "refersTo": "switch-track",
+      "description": "Pill switch, cobalt when on.",
+      "html": "<div class=\"ds-wrap\"><label class=\"ds-switch\"><input type=\"checkbox\" role=\"switch\" checked><span class=\"ds-track\"></span><span>Mirror</span></label><label class=\"ds-switch\"><input type=\"checkbox\" role=\"switch\"><span class=\"ds-track\"></span><span>Freeze</span></label></div>",
+      "css": ":host{--canvas:#0e0f11;--panel:#15171a;--raised:#1c1f23;--hover:#23272c;--line:#2a2e34;--line-strong:#3a3f46;--tx:#e6e8eb;--tx2:#a6acb4;--tx3:#8a9099;--acc:#5b8cff;--acc-tx:#8fb0ff;--acc-soft:rgb(91 140 255 / .14);--r:6px;--ctl:28px;--font:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,Roboto,sans-serif;--mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;--ease:cubic-bezier(.2,.8,.2,1);font:13px/1.4 var(--font);color:var(--tx);font-variant-numeric:tabular-nums;} .ds-wrap{display:flex;gap:16px;padding:12px 16px;background:var(--panel)} .ds-switch{display:inline-flex;align-items:center;gap:8px;min-height:24px;cursor:pointer;color:var(--tx2);position:relative} .ds-switch input{position:absolute;opacity:0;width:1px;height:1px} .ds-track{width:26px;height:16px;border-radius:8px;background:var(--line-strong);position:relative;transition:background .15s} .ds-track::after{content:'';position:absolute;top:2px;left:2px;width:12px;height:12px;border-radius:50%;background:#fff;transition:transform .15s var(--ease)} .ds-switch input:checked+.ds-track{background:var(--acc)} .ds-switch input:checked+.ds-track::after{transform:translateX(10px)} .ds-switch input:checked~span:last-child{color:var(--tx)} .ds-switch input:focus-visible+.ds-track{outline:2px solid var(--acc);outline-offset:2px}"
+    },
+    {
+      "name": "Picker",
+      "kind": "input",
+      "refersTo": "picker",
+      "description": "Recessed trigger that opens a searchable popover.",
+      "html": "<div class=\"ds-wrap\"><button class=\"ds-picker\" aria-expanded=\"false\"><span class=\"ds-val\">Fire 2012</span><svg width=\"16\" height=\"16\" viewBox=\"0 0 16 16\" aria-hidden=\"true\"><path d=\"m4.5 6.25 3.5 3.5 3.5-3.5\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg></button></div>",
+      "css": ":host{--canvas:#0e0f11;--panel:#15171a;--raised:#1c1f23;--hover:#23272c;--line:#2a2e34;--line-strong:#3a3f46;--tx:#e6e8eb;--tx2:#a6acb4;--tx3:#8a9099;--acc:#5b8cff;--acc-tx:#8fb0ff;--acc-soft:rgb(91 140 255 / .14);--r:6px;--ctl:28px;--font:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,Roboto,sans-serif;--mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;--ease:cubic-bezier(.2,.8,.2,1);font:13px/1.4 var(--font);color:var(--tx);font-variant-numeric:tabular-nums;} .ds-wrap{padding:12px 16px;background:var(--panel);width:288px} .ds-picker{width:100%;height:var(--ctl);display:flex;align-items:center;gap:8px;padding:0 6px 0 8px;border:1px solid var(--line);border-radius:var(--r);background:var(--canvas);color:var(--tx);font:13px var(--font);text-align:left;cursor:pointer} .ds-picker:hover{border-color:var(--line-strong)} .ds-picker[aria-expanded=true],.ds-picker:focus-visible{border-color:var(--acc);outline:none} .ds-val{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .ds-picker svg{color:var(--tx3)}"
+    },
+    {
+      "name": "Search List Popover",
+      "kind": "custom",
+      "refersTo": "popover",
+      "description": "Floating search list used by pickers and the command palette.",
+      "html": "<div class=\"ds-pop\" role=\"dialog\"><div class=\"ds-sb\"><svg width=\"16\" height=\"16\" viewBox=\"0 0 16 16\" aria-hidden=\"true\"><path d=\"M7 12.25a5.25 5.25 0 1 0 0-10.5 5.25 5.25 0 0 0 0 10.5ZM14.25 14.25l-3.5-3.5\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg><input placeholder=\"Search effects\"></div><div class=\"ds-items\" role=\"listbox\"><div class=\"ds-it\" role=\"option\">Fire Flicker</div><div class=\"ds-it ds-hi\" role=\"option\">Fire 2012</div><div class=\"ds-it ds-sel\" role=\"option\" aria-selected=\"true\">Fireworks</div></div></div>",
+      "css": ":host{--canvas:#0e0f11;--panel:#15171a;--raised:#1c1f23;--hover:#23272c;--line:#2a2e34;--line-strong:#3a3f46;--tx:#e6e8eb;--tx2:#a6acb4;--tx3:#8a9099;--acc:#5b8cff;--acc-tx:#8fb0ff;--acc-soft:rgb(91 140 255 / .14);--r:6px;--ctl:28px;--font:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,Roboto,sans-serif;--mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;--ease:cubic-bezier(.2,.8,.2,1);font:13px/1.4 var(--font);color:var(--tx);font-variant-numeric:tabular-nums;} .ds-pop{width:280px;background:var(--raised);border:1px solid var(--line-strong);border-radius:8px;box-shadow:0 12px 32px rgb(0 0 0 / .5),0 2px 6px rgb(0 0 0 / .35);overflow:hidden;animation:ds-pop .14s var(--ease)} @keyframes ds-pop{from{opacity:0;transform:translateY(-4px) scale(.98)}} .ds-sb{display:flex;align-items:center;gap:8px;padding:0 10px;height:36px;border-bottom:1px solid var(--line);color:var(--tx3)} .ds-sb input{flex:1;min-width:0;height:100%;border:0;background:none;color:var(--tx);font:13px var(--font);outline:none} .ds-sb input::placeholder{color:var(--tx3)} .ds-items{padding:4px} .ds-it{display:flex;align-items:center;height:30px;padding:0 8px;border-radius:5px;color:var(--tx2);cursor:pointer} .ds-it:hover,.ds-hi{background:var(--hover);color:var(--tx)} .ds-sel{color:var(--acc-tx)}"
+    },
+    {
+      "name": "Timeline Clips",
+      "kind": "custom",
+      "refersTo": "clip-label",
+      "description": "Segments as clips on one lane; each shows its live LEDs. Selected clip gets the cobalt ring.",
+      "html": "<div class=\"ds-lane\"><button class=\"ds-clip\" style=\"left:0;width:34%;background:#ff0000\"><span class=\"ds-cl\">Seg 0</span></button><button class=\"ds-clip ds-on\" style=\"left:34%;width:33%;background:#fbf0ff\"><span class=\"ds-cl\">Seg 1</span></button><button class=\"ds-clip\" style=\"left:67%;width:33%;background:#0000ff\"><span class=\"ds-cl\">Seg 2</span></button><span class=\"ds-edge\" style=\"left:34%\"></span><span class=\"ds-edge\" style=\"left:67%\"></span></div>",
+      "css": ":host{--canvas:#0e0f11;--panel:#15171a;--raised:#1c1f23;--hover:#23272c;--line:#2a2e34;--line-strong:#3a3f46;--tx:#e6e8eb;--tx2:#a6acb4;--tx3:#8a9099;--acc:#5b8cff;--acc-tx:#8fb0ff;--acc-soft:rgb(91 140 255 / .14);--r:6px;--ctl:28px;--font:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,Roboto,sans-serif;--mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;--ease:cubic-bezier(.2,.8,.2,1);font:13px/1.4 var(--font);color:var(--tx);font-variant-numeric:tabular-nums;} .ds-lane{position:relative;height:64px;width:480px;background:var(--canvas)} .ds-clip{position:absolute;top:2px;bottom:2px;border:0;padding:0;border-radius:5px;box-shadow:inset 0 0 0 1px rgb(255 255 255 / .1);cursor:pointer} .ds-clip:hover{box-shadow:inset 0 0 0 1px rgb(255 255 255 / .28)} .ds-clip:focus-visible{outline:2px solid var(--acc);outline-offset:2px} .ds-on{box-shadow:inset 0 0 0 2px var(--acc)} .ds-cl{position:absolute;left:6px;top:6px;padding:1px 6px;border-radius:4px;background:rgb(14 15 17 / .78);font:500 11px var(--font);color:var(--tx)} .ds-on .ds-cl{background:var(--acc);color:#fff} .ds-edge{position:absolute;top:-2px;bottom:-2px;width:14px;margin-left:-7px;cursor:ew-resize} .ds-edge::after{content:'';position:absolute;left:6px;top:10px;bottom:10px;width:2px;border-radius:1px;background:var(--tx);opacity:0;transition:opacity .12s} .ds-lane:hover .ds-edge::after{opacity:.5} .ds-edge:hover::after{opacity:1;background:var(--acc)}"
+    },
+    {
+      "name": "Library Rows",
+      "kind": "custom",
+      "refersTo": "library-row",
+      "description": "Dense list rows with current state, tags and hover-revealed favourite.",
+      "html": "<div class=\"ds-list\"><div class=\"ds-lr ds-cur\"><button class=\"ds-ap\">Solid</button></div><div class=\"ds-lr\"><button class=\"ds-ap\">Akemi <span class=\"ds-tags\"><span class=\"ds-tag\">2D</span></span></button></div><div class=\"ds-lr\"><button class=\"ds-ap\">Aurora <span class=\"ds-tags\"><span class=\"ds-tag ds-acc\">Script</span></span></button></div></div>",
+      "css": ":host{--canvas:#0e0f11;--panel:#15171a;--raised:#1c1f23;--hover:#23272c;--line:#2a2e34;--line-strong:#3a3f46;--tx:#e6e8eb;--tx2:#a6acb4;--tx3:#8a9099;--acc:#5b8cff;--acc-tx:#8fb0ff;--acc-soft:rgb(91 140 255 / .14);--r:6px;--ctl:28px;--font:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,Roboto,sans-serif;--mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;--ease:cubic-bezier(.2,.8,.2,1);font:13px/1.4 var(--font);color:var(--tx);font-variant-numeric:tabular-nums;} .ds-list{display:grid;gap:1px;padding:6px 8px;width:240px;background:var(--canvas)} .ds-lr{display:flex;border-radius:var(--r)} .ds-lr:hover{background:var(--hover)} .ds-cur{background:var(--acc-soft)} .ds-cur .ds-ap{color:var(--acc-tx);font-weight:600} .ds-ap{flex:1;height:30px;display:flex;align-items:center;gap:8px;padding:0 8px;border:0;background:none;color:var(--tx);font:13px var(--font);text-align:left;border-radius:var(--r);cursor:pointer} .ds-ap:focus-visible{outline:2px solid var(--acc);outline-offset:1px} .ds-tags{margin-left:auto;display:inline-flex;gap:4px} .ds-tag{display:inline-flex;align-items:center;height:16px;padding:0 5px;border-radius:4px;font:600 10px var(--font);color:var(--tx3);background:var(--raised)} .ds-acc{color:var(--tx2);box-shadow:inset 0 0 0 1px var(--line-strong)}"
+    },
+    {
+      "name": "Rail Navigation",
+      "kind": "nav",
+      "refersTo": "",
+      "description": "56px icon-and-label rail; current page on raised with cobalt-text icon.",
+      "html": "<nav class=\"ds-rail\"><a class=\"ds-ri\" aria-current=\"page\" href=\"#\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 16 16\" aria-hidden=\"true\"><path d=\"M7 12.25a5.25 5.25 0 1 0 0-10.5 5.25 5.25 0 0 0 0 10.5ZM14.25 14.25l-3.5-3.5\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg><span>Lights</span></a><a class=\"ds-ri\" href=\"#\"><svg width=\"18\" height=\"18\" viewBox=\"0 0 16 16\" aria-hidden=\"true\"><path d=\"M8 1.75v12.5M5.25 5 2.75 8l2.5 3M10.75 5l2.5 3-2.5 3\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\" stroke-linecap=\"round\" stroke-linejoin=\"round\"/></svg><span>Presets</span></a></nav>",
+      "css": ":host{--canvas:#0e0f11;--panel:#15171a;--raised:#1c1f23;--hover:#23272c;--line:#2a2e34;--line-strong:#3a3f46;--tx:#e6e8eb;--tx2:#a6acb4;--tx3:#8a9099;--acc:#5b8cff;--acc-tx:#8fb0ff;--acc-soft:rgb(91 140 255 / .14);--r:6px;--ctl:28px;--font:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,Roboto,sans-serif;--mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;--ease:cubic-bezier(.2,.8,.2,1);font:13px/1.4 var(--font);color:var(--tx);font-variant-numeric:tabular-nums;} .ds-rail{display:flex;flex-direction:column;gap:2px;width:56px;padding:8px 6px;background:var(--panel);border-right:1px solid var(--line)} .ds-ri{display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 0 6px;border-radius:var(--r);color:var(--tx3);text-decoration:none;font-size:10px} .ds-ri:hover{color:var(--tx);background:var(--hover)} .ds-ri:focus-visible{outline:2px solid var(--acc);outline-offset:1px} .ds-ri[aria-current=page]{color:var(--tx);background:var(--raised)} .ds-ri[aria-current=page] svg{color:var(--acc-tx)}"
+    },
+    {
+      "name": "Toast",
+      "kind": "custom",
+      "refersTo": "toast",
+      "description": "Announces a structural edit with inline Undo.",
+      "html": "<div class=\"ds-toast\" role=\"status\"><span>Split Seg 1 at LED 120</span><button class=\"ds-btn\">Undo <kbd class=\"ds-kbd\">⌘Z</kbd></button></div>",
+      "css": ":host{--canvas:#0e0f11;--panel:#15171a;--raised:#1c1f23;--hover:#23272c;--line:#2a2e34;--line-strong:#3a3f46;--tx:#e6e8eb;--tx2:#a6acb4;--tx3:#8a9099;--acc:#5b8cff;--acc-tx:#8fb0ff;--acc-soft:rgb(91 140 255 / .14);--r:6px;--ctl:28px;--font:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,Roboto,sans-serif;--mono:ui-monospace,'SF Mono',Menlo,Consolas,monospace;--ease:cubic-bezier(.2,.8,.2,1);font:13px/1.4 var(--font);color:var(--tx);font-variant-numeric:tabular-nums;} .ds-toast{display:inline-flex;align-items:center;gap:12px;padding:6px 6px 6px 14px;border-radius:8px;background:var(--raised);border:1px solid var(--line-strong);box-shadow:0 8px 24px rgb(0 0 0 / .5)} .ds-btn{display:inline-flex;align-items:center;gap:6px;height:var(--ctl);padding:0 10px;border:1px solid var(--line-strong);border-radius:var(--r);background:var(--raised);color:var(--tx);font:500 13px var(--font);cursor:pointer} .ds-btn:hover{background:var(--hover)} .ds-btn:focus-visible{outline:2px solid var(--acc);outline-offset:1px} .ds-kbd{display:inline-grid;place-items:center;min-width:18px;height:18px;padding:0 4px;border:1px solid var(--line-strong);border-radius:4px;font:11px var(--font);color:var(--tx2);background:var(--raised)}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Lighting Desk",
+    "overview": "WLED Studio is a professional tool that sits beside a strip of LEDs in a dim room. The interface is graphite and recessive so the only saturated colour on screen is the light itself: live pixels inside the timeline clips, palette swatch bars, colour swatches. Everything the builder touches is small, crisp and exact, in the register of Linear and Figma: 13px system UI with tabular numerals, 28px controls, 1px hairlines, 6px corners, authored 16px stroke icons.\n\nThe system is dark-only, and that is a scene decision, not a theme preference. The builder judges LED output by eye, often with the room lights low; a bright UI would wash out their perception of the strip and fight the preview for attention. There is no light mode and none should be added without revisiting that scene (`color-scheme: dark`, theme-color matches the panel).\n\nDensity is the default. Panels are separated by hairlines and four tonal steps, never by cards or shadows. One accent, cobalt, marks what is selected, focused, engaged or primary; it never decorates. Interaction speed is part of the visual system: a control the user is holding never moves under them, and the LEDs answer on the next frame.",
+    "keyCharacteristics": [
+      "Dark-only graphite in four tonal steps; the light is the only colour.",
+      "One accent (cobalt) reserved for selection, focus, engaged state and the primary action.",
+      "13px system UI, tabular numerals everywhere, monospace only for values that are code-like (hex, IP, scripts).",
+      "28px control height (32px on narrow screens), 1px hairlines, 6px radius.",
+      "Keyboard-first: every list is arrow-navigable, every common action has a single-key shortcut, ⌘K reaches everything.",
+      "Input ownership: local state renders immediately, device echoes never override a touched control."
+    ],
+    "rules": [
+      {
+        "name": "The Light Is the Colour Rule",
+        "body": "Saturated colour on screen comes from the device: live pixels in clips, the matrix preview, palette swatch bars, colour swatches, the hue strip. Chrome stays graphite.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Voice Rule",
+        "body": "Cobalt means \"this is selected, focused, engaged, or the primary action\". It is never used for decoration, headings, links-as-ornament or illustration. If a screen has two cobalt fills, one of them should be a selection.",
+        "section": "colors"
+      },
+      {
+        "name": "The Recessed Input Rule",
+        "body": "Fields are darker than their surroundings (`canvas` on `panel`), with a transparent or `line` border at rest, `line-strong` on hover and `cobalt` on focus.",
+        "section": "colors"
+      },
+      {
+        "name": "The Tabular Rule",
+        "body": "`font-variant-numeric: tabular-nums` is global; any number that can change while visible must not shift its neighbours.",
+        "section": "typography"
+      },
+      {
+        "name": "The No Display Face Rule",
+        "body": "There is no display size. The largest type is 15px; hierarchy comes from weight, case and the grey ramp, not from scale.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat Shell Rule",
+        "body": "Nothing docked to the shell casts a shadow. If it does not float, separate it with a hairline.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Ring Is Focus Rule",
+        "body": "A zero-offset ring is only ever a selection or focus indicator in cobalt (selected clip, open swatch, focused edge handle). It is never ambient glow.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "**Do** keep chrome graphite and let the LEDs, palettes and swatches carry all saturated colour.",
+      "**Do** reserve cobalt for selection, focus, engaged state (on, checked, filled) and the single primary action; use `cobalt-text` when cobalt is foreground text.",
+      "**Do** build every control at 28px (32px at ≤860px) with 6px corners and 1px hairlines.",
+      "**Do** recess inputs to `canvas` with a cobalt border on focus.",
+      "**Do** give every list arrow-key navigation and every frequent action a shortcut shown as a kbd hint.",
+      "**Do** apply edits locally first, flush at most once per frame, and protect a touched field from echoes for 800 ms.",
+      "**Do** make structural segment edits undoable and announce them with a toast.",
+      "**Do** inset-ring any colour content (clips, swatches, swatch bars) so it keeps an edge against the dark chrome."
+    ],
+    "donts": [
+      "**Don't** add a light theme or bright surfaces; the UI is used beside the lights in dim rooms.",
+      "**Don't** use cobalt, or any other hue, for decoration, headings or illustration.",
+      "**Don't** use decorative gradients or glows. Gradients appear only where they are the content (palette swatch bars, the hue strip, the colour plane); the slider fill is a hard stop.",
+      "**Don't** put cards or shadows on docked panels; shadows are for floating surfaces only.",
+      "**Don't** introduce a display size or second typeface; hierarchy is weight, case and grey.",
+      "**Don't** let incoming device state move a control the user is holding or typing in.",
+      "**Don't** replace the authored 16px stroke icons (1.5px stroke, round caps) with an icon font or mixed sets."
+    ]
+  }
+}

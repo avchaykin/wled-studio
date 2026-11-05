@@ -33,6 +33,7 @@
     "node": ">=20.0.0"
   },
   "devDependencies": {
-    "esbuild": "^0.25.10"
+    "esbuild": "^0.25.10",
+    "preact": "^10.27.2"
   }
 }
