@@ -4,7 +4,7 @@
 Bumps wled00/studio_version.h, rebuilds the Studio UI header and the firmware, then adds
 the binary and a manifest entry to the public release repo (served by GitHub Pages at
 https://avchaykin.github.io/wled-studio-releases/), which Studio's update check reads.
-The source repo stays private: only binaries and release notes are published.
+Each release links to its tagged source in the public repo avchaykin/wled-studio (EUPL).
 
   python3 tools/release.py 0.2.0 -n "Presets on Lights" -n "Palette editor"
   python3 tools/release.py 0.2.0 --dry-run      # build and stage, commit/push nothing
@@ -69,7 +69,9 @@ def main():
         builds[ENVS[env]] = {"file": f"fw/{name}", "size": len(data), "sha256": hashlib.sha256(data).hexdigest(), "env": env}
         print(f"  {name}: {len(data)} bytes")
 
-    rel = {"version": a.version, "date": datetime.date.today().isoformat(), "notes": a.note, "builds": builds}
+    # EUPL: every published binary points at its exact source
+    rel = {"version": a.version, "date": datetime.date.today().isoformat(), "notes": a.note,
+           "source": f"https://github.com/avchaykin/wled-studio/tree/v{a.version}", "builds": builds}
     manifest["releases"] = [rel] + [r for r in manifest["releases"] if r["version"] != a.version]
     manifest["latest"] = a.version
     json.dump(manifest, open(manifest_path, "w"), indent=1)
