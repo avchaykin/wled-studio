@@ -41,14 +41,15 @@ export function DevicesPage() {
   // probe new rows at once, all rows every REFRESH_MS (skipping rows that are updating)
   useEffect(() => { ips.filter(ip => devs[ip].st === 'loading' && !devs[ip].probing).forEach(ip => { patch(ip, { probing: true }); refreshOne(ip); }); }, [ips.join()]);
   useEffect(() => {
-    const t = setInterval(() => { reload(); Object.values(devs).filter(d => !d.job).forEach(d => refreshOne(d.ip)); }, REFRESH_MS);
+    const t = setInterval(() => { reload(); Object.values(devs).filter(d => !busy(d.ip)).forEach(d => refreshOne(d.ip)); }, REFRESH_MS);
     return () => clearInterval(t);
   });
 
   const toggle = ip => setChecked(c => { const n = new Set(c); n.has(ip) ? n.delete(ip) : n.add(ip); return n; });
   const sel = ips.filter(ip => checked.has(ip));
   const rel = ip => (devs[ip].info ? updateFor(devs[ip].info, manifest) : null);
-  const updatable = sel.filter(ip => rel(ip)?.newer && studioVersion(devs[ip].info) && !devs[ip].job);
+  const busy = ip => devs[ip].job && !['error', 'done'].includes(devs[ip].job.phase); // a failed update can be retried
+  const updatable = sel.filter(ip => rel(ip)?.newer && studioVersion(devs[ip].info) && !busy(ip));
 
   const addDevice = async (ip, name) => {
     const { info } = await probe(ip);
@@ -153,7 +154,7 @@ function DeviceRow({ d, rel, checked, onCheck, onRemove, onChanged }) {
           <>
             <div>{sv ? `Studio ${sv}` : `WLED ${info.ver}`}{rel?.newer && sv && <span class="tag accent">{rel.version} available</span>}{rel && !rel.newer && <span class="tag ok">Latest</span>}</div>
             <div class="muted small-line">{sv ? `WLED ${info.ver}` : 'Not WLED Studio'}</div>
-            {job && <div class={`jobline${job.phase === 'error' ? ' error' : ''}`} role="status">{job.phase === 'error' ? job.msg : `${PHASE[job.phase]}${job.p != null && (job.phase === 'download' || job.phase === 'upload') ? ` ${Math.round(job.p * 100)}%` : job.phase === 'done' ? '' : '…'}`}</div>}
+            {job && <div class={`jobline${job.phase === 'error' ? ' error' : ''}`} role="status">{job.phase === 'error' ? job.msg : `${PHASE[job.phase]}${job.p != null && (job.phase === 'download' || job.phase === 'upload') ? ` ${Math.round(job.p * 100)}%` : job.phase === 'done' ? '' : '…'}${job.attempt > 1 ? ` (try ${job.attempt})` : ''}`}</div>}
           </>
         )}
       </td>

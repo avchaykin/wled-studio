@@ -87,10 +87,18 @@ export async function waitForVersion(host, version, timeoutMs = 90e3) {
   throw new Error('The device did not come back with the new version in time');
 }
 
-// Whole flow for one device; onStep({ phase: 'download'|'upload'|'reboot'|'done', p })
+// Whole flow for one device; onStep({ phase: 'download'|'upload'|'reboot'|'done', p, attempt })
+// A dropped upload leaves the old firmware running, so it is simply tried again (weak Wi-Fi).
 export async function updateDevice(host, rel, onStep) {
   const blob = await downloadFirmware(rel.build, p => onStep?.({ phase: 'download', p }));
-  await flashFirmware(host, blob, p => onStep?.({ phase: 'upload', p }));
+  for (let attempt = 1; ; attempt++) {
+    try { await flashFirmware(host, blob, p => onStep?.({ phase: 'upload', p, attempt })); break; }
+    catch (e) {
+      if (attempt >= 3 || !/Connection lost|timed out|HTTP (0|503)/.test(e.message)) throw e;
+      onStep?.({ phase: 'upload', p: 0, attempt: attempt + 1 });
+      await new Promise(r => setTimeout(r, 3000));
+    }
+  }
   onStep?.({ phase: 'reboot' });
   const info = await waitForVersion(host, rel.version);
   onStep?.({ phase: 'done', info });
