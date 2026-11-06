@@ -116,6 +116,7 @@ export function paletteItems(cat, favs) {
   const key = cat && `${cat.palettes.length}|${favs.join()}`;
   if (cat && key === palMemo.key && palMemo.cat === cat) return palMemo.items;
   const items = (cat?.palettes ?? []).map((text, id) => ({ key: id, id, text, fav: favs.includes(id), dyn: id < DYNAMIC_PALETTES }))
+    .concat((cat?.custom ?? []).map(p => ({ key: p.id, id: p.id, text: p.name, fav: favs.includes(p.id), dyn: false, custom: p.idx })))
     .sort((a, b) => (b.dyn - a.dyn) || (a.dyn ? a.id - b.id : a.text.localeCompare(b.text)));
   palMemo = { key, cat, items };
   return items;
@@ -229,7 +230,7 @@ function ColorRow({ seg, slot, label }) {
 const SWATCHES = ['#ff0000', '#ff6a00', '#ffc800', '#00ff3c', '#00d5ff', '#0040ff', '#8c00ff', '#ff00aa', '#ffffff', '#ffb070', '#000000'];
 
 // Saturation/value square + hue strip. Keeps HSV locally so hue survives dark/grey colours.
-function ColorPicker({ rgb, onChange }) {
+export function ColorPicker({ rgb, onChange }) {
   const [hsv, setHsv] = useState(() => rgb2hsv(rgb));
   const sv = useRef(null), hue = useRef(null);
   const last = useRef(hex(rgb));

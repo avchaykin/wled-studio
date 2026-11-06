@@ -13,6 +13,7 @@ let data = {
   state: null, info: null, cat: null, online: false,
   sel: 0, page: 'lights', libTab: 'presets',
   presets: null,            // /presets.json, null until loaded
+  customPals: [],           // [{ idx, id, name, stops }] from /palette<idx>.json
   favs: load('studio.favs', []),        // effect ids
   palFavs: load('studio.palfavs', []),  // palette ids
   palette: false,           // command palette open
@@ -211,6 +212,48 @@ export async function renamePreset(id, name) {
   set({ presets: p });
 }
 
+// ---------- custom palettes ----------
+// /palette<idx>.json = { name, palette: [pos, "rrggbb", ...] }; the device reloads them on
+// upload and serves them as palette id 200 - idx. "name" is ours (the firmware ignores it).
+export const CUSTOM_PAL_BASE = 200;
+const parseStops = arr => {
+  const out = [];
+  if (typeof arr?.[1] === 'string') for (let i = 0; i + 1 < arr.length; i += 2) { const n = parseInt(arr[i + 1], 16); out.push([arr[i], (n >> 16) & 255, (n >> 8) & 255, n & 255]); }
+  else for (let i = 0; i + 3 < (arr?.length ?? 0); i += 4) out.push(arr.slice(i, i + 4));
+  return out;
+};
+export async function loadCustomPalettes() {
+  const files = await getJson('/edit?list=/').catch(() => []);
+  const idxs = files.map(f => /^\/?palette(\d+)\.json$/.exec(f.name)?.[1]).filter(Boolean).map(Number).sort((a, b) => a - b);
+  const pals = [];
+  for (const idx of idxs) {
+    try {
+      const f = await getJson(`/palette${idx}.json`);
+      pals.push({ idx, id: CUSTOM_PAL_BASE - idx, name: f.name || `Custom ${idx}`, stops: parseStops(f.palette) });
+    } catch { /* unreadable file: skip */ }
+  }
+  set({ customPals: pals, cat: withCustoms(data.cat, pals) });
+  return pals;
+}
+// merge custom palettes into the (cached, device-wide) catalogue
+function withCustoms(cat, pals = data.customPals) {
+  if (!cat) return cat;
+  const palx = { ...cat.palx };
+  for (const p of pals) palx[p.id] = p.stops;
+  return { ...cat, palx, custom: pals };
+}
+export async function saveCustomPalette(idx, name, stops) {
+  if (idx == null) { const used = new Set(data.customPals.map(p => p.idx)); idx = 0; while (used.has(idx)) idx++; }
+  const palette = stops.flatMap(([pos, r, g, b]) => [pos, ((r << 16) | (g << 8) | b).toString(16).padStart(6, '0')]);
+  await upload(`/palette${idx}.json`, JSON.stringify({ name, palette }), 'application/json');
+  await loadCustomPalettes();
+  return CUSTOM_PAL_BASE - idx;
+}
+export async function deleteCustomPalette(idx) {
+  await postJson('/json/state', { rmcpal: idx });
+  await loadCustomPalettes();
+}
+
 // Effect/palette catalogue, cached per firmware build + script set
 export async function loadCatalogue(info) {
   const key = `studio.cat.${info.vid}.${(info.glow?.slots ?? []).map(s => s.file).join(',')}`;
@@ -233,12 +276,13 @@ export async function boot() {
   const { state, info } = await getJson('/json/si');
   set({ state, info, sel: state.mainseg ?? 0 });
   loadPresets();
-  set({ cat: await loadCatalogue(info) });
+  set({ cat: withCustoms(await loadCatalogue(info)) });
+  loadCustomPalettes();
   let lastScripts = (info.glow?.slots ?? []).map(s => s.file).join(','), loading = false;
   subs.add(async () => {
     const now = (data.info?.glow?.slots ?? []).map(s => s.file).join(',');
     if (now === lastScripts || loading || !data.info) return;
     lastScripts = now; loading = true;
-    try { set({ cat: await loadCatalogue(data.info) }); } finally { loading = false; }
+    try { set({ cat: withCustoms(await loadCatalogue(data.info)) }); } finally { loading = false; }
   });
 }

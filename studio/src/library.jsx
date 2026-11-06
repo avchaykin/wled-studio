@@ -5,6 +5,7 @@ import { IconButton, DeleteButton, Chips } from './ui.jsx';
 import { Icon } from './icons.jsx';
 import { effectItems, paletteItems, FxTags, FavStar } from './inspector.jsx';
 import { paletteCss } from './lib.js';
+import { editPalette } from './palette-editor.jsx';
 
 const FILTERS = [['all', 'All'], ['fav', 'Favourites'], ['glow', 'Scripts'], ['audio', 'Audio'], ['2d', '2D']];
 const PAL_FILTERS = [['all', 'All'], ['fav', 'Favourites']];
@@ -56,6 +57,12 @@ export function Library() {
           <input value={q} placeholder={tab === 'effects' ? 'Filter effects' : 'Filter palettes'} aria-label="Filter" spellcheck={false} onInput={e => setQ(e.currentTarget.value)} />
         </div>
         <Chips label={tab === 'effects' ? 'Effect filters' : 'Palette filters'} options={tab === 'effects' ? FILTERS : PAL_FILTERS} value={filter} onChange={setFilter} />
+        {tab === 'palettes' && cat && (
+          <button type="button" class="btn lib-new" title="Start from the selected segment's palette"
+            onClick={() => editPalette({ name: `${paletteItems(cat, palFavs).find(it => it.id === seg?.pal)?.text?.replace(/^\* /, '') ?? 'New'} copy`, seed: cat.palx[seg?.pal ?? 0], cols: seg?.col })}>
+            <Icon name="plus" />New palette
+          </button>
+        )}
       </div>
       <div class={`lib-list ${tab}`} ref={listRef} onKeyDown={onKey}>
         {rows.length ? rows.map(it => (
@@ -64,7 +71,13 @@ export function Library() {
               {tab === 'palettes' && <span class="swatchbar" style={{ background: paletteCss(cat.palx[it.id], seg?.col) }} />}
               <span class="lib-name">{it.text}</span>
               {tab === 'effects' && <FxTags it={it} />}
+              {it.custom != null && <span class="tags"><span class="tag">Custom</span></span>}
             </button>
+            {it.custom != null && (
+              <span class="lib-actions">
+                <IconButton icon="pencil" label={`Edit ${it.text}`} onClick={() => editPalette({ idx: it.custom, name: it.text, seed: cat.palx[it.id] })} />
+              </span>
+            )}
             <FavStar it={it} kind={tab === 'effects' ? 'favs' : 'palFavs'} />
           </div>
         )) : !cat ? (

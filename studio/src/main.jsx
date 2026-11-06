@@ -8,6 +8,7 @@ import { Timeline, hover, splitSegment, deleteSegment, undo } from './timeline.j
 import { Inspector } from './inspector.jsx';
 import { Library } from './library.jsx';
 import { CommandPalette } from './command.jsx';
+import { PaletteEditor } from './palette-editor.jsx';
 import { ScriptsPage, SettingsPage } from './pages.jsx';
 import { isMac } from './lib.js';
 
@@ -84,6 +85,7 @@ function App() {
         {page === 'settings' && <SettingsPage />}
       </main>
       <CommandPalette />
+      <PaletteEditor />
       <Toast />
     </div>
   );
@@ -104,9 +106,10 @@ function Toast() {
 function shortcuts(e) {
   const mod = e.metaKey || e.ctrlKey;
   if (mod && e.key.toLowerCase() === 'k') { e.preventDefault(); set({ palette: !getState().palette }); return; }
-  if (mod && !e.shiftKey && e.key.toLowerCase() === 'z' && !e.target.closest?.('input, textarea')) { if (undo()) e.preventDefault(); return; }
+  if (mod && !e.shiftKey && e.key.toLowerCase() === 'z' && !e.target.closest?.('input, textarea') && !document.querySelector('dialog[open]')) { if (undo()) e.preventDefault(); return; }
   const t = e.target;
-  if (mod || e.altKey || getState().palette || t.closest?.('input, textarea, select, [contenteditable], dialog')) return;
+  // nothing reaches the page behind an open modal (palette editor, command palette)
+  if (mod || e.altKey || getState().palette || document.querySelector('dialog[open]') || t.closest?.('input, textarea, select, [contenteditable], dialog')) return;
   const d = getState(); const segs = (d.state?.seg ?? []).filter(s => s.stop > s.start); const seg = selSeg(d);
   const i = segs.findIndex(s => s.id === seg?.id);
   switch (e.key) {
