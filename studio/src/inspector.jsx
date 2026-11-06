@@ -1,7 +1,7 @@
 // Inspector for the selected segment.
 import { useRef, useState, useEffect } from 'preact/hooks';
-import { useStore, selSeg, editSeg, glowFx } from './store.js';
-import { Slider, NumberField, Switch, IconButton, Section, Popover, SearchList } from './ui.jsx';
+import { useStore, selSeg, editSeg, glowFx, toggleFav } from './store.js';
+import { Slider, NumberField, Switch, IconButton, Section, Popover, SearchList, Chips } from './ui.jsx';
 import { Icon } from './icons.jsx';
 import { fxMeta, hex, fromHex, rgb2hsv, hsv2rgb, paletteCss } from './lib.js';
 import { splitSegment, mergeIntoPrevious, deleteSegment } from './timeline.jsx';
@@ -108,6 +108,28 @@ function buildEffectItems(cat, glow, favs) {
     .filter(e => e.text && e.text !== 'RSVD' && !e.text.startsWith('-'))
     .sort((a, b) => (a.id === 0 ? -1 : b.id === 0 ? 1 : (b.fav - a.fav) || a.text.localeCompare(b.text)));
 }
+// Palettes: the six that are built from the segment colours (Default … Colors Only) stay
+// on top in device order; the rest are alphabetical.
+const DYNAMIC_PALETTES = 6;
+let palMemo = { key: null, items: [] };
+export function paletteItems(cat, favs) {
+  const key = cat && `${cat.palettes.length}|${favs.join()}`;
+  if (cat && key === palMemo.key && palMemo.cat === cat) return palMemo.items;
+  const items = (cat?.palettes ?? []).map((text, id) => ({ key: id, id, text, fav: favs.includes(id), dyn: id < DYNAMIC_PALETTES }))
+    .sort((a, b) => (b.dyn - a.dyn) || (a.dyn ? a.id - b.id : a.text.localeCompare(b.text)));
+  palMemo = { key, cat, items };
+  return items;
+}
+export function FavStar({ it, kind, inList }) {
+  return (
+    <button type="button" class={`fav${it.fav ? ' on' : ''}${inList ? ' in-list' : ''}`} aria-pressed={it.fav}
+      aria-label={it.fav ? `Remove ${it.text} from favourites` : `Add ${it.text} to favourites`}
+      onClick={e => { e.stopPropagation(); toggleFav(kind, it.id); }} onPointerDown={e => e.stopPropagation()}>
+      <Icon name="star" fill={it.fav} />
+    </button>
+  );
+}
+
 export function FxTags({ it }) {
   return (
     <span class="tags">
@@ -148,19 +170,24 @@ function EffectField({ seg, cat }) {
 function PaletteField({ seg, cat }) {
   const btn = useRef(null);
   const [open, setOpen] = useState(false);
-  const pals = cat?.palettes ?? [];
+  const [onlyFav, setOnlyFav] = useState(false);
+  const favs = useStore(d => d.palFavs);
+  const items = paletteItems(cat, favs);
+  const name = items.find(it => it.id === seg.pal)?.text ?? `Palette ${seg.pal}`;
   return (
     <>
       <button ref={btn} type="button" class="picker" onClick={() => setOpen(o => !o)} aria-haspopup="dialog" aria-expanded={open}>
         <span class="swatchbar" style={{ background: paletteCss(cat?.palx?.[seg.pal], seg.col) }} />
-        <span class="picker-value">{pals[seg.pal] ?? `Palette ${seg.pal}`}</span><Icon name="chevron" />
+        <span class="picker-value">{name}</span><Icon name="chevron" />
       </button>
       {open && (
         <Popover anchor={btn.current} onClose={() => setOpen(false)} width={320} label="Choose palette">
+          <Chips label="Palette filter" value={onlyFav ? 'fav' : 'all'} onChange={v => setOnlyFav(v === 'fav')} options={[['all', 'All'], ['fav', `Favourites${favs.length ? ` ${favs.length}` : ''}`]]} />
           <SearchList
-            placeholder="Search palettes" selectedKey={seg.pal}
-            items={pals.map((text, id) => ({ key: id, text, id }))}
-            render={(it, selected) => <><span class="swatchbar" style={{ background: paletteCss(cat.palx[it.id], seg.col) }} /><span class="sl-text">{it.text}</span>{selected && <Icon name="check" />}</>}
+            key={onlyFav} placeholder="Search palettes" selectedKey={seg.pal}
+            items={onlyFav ? items.filter(it => it.fav) : items}
+            empty={onlyFav ? 'Star palettes to list them here.' : undefined}
+            render={(it, selected) => <><span class="swatchbar" style={{ background: paletteCss(cat.palx[it.id], seg.col) }} /><span class="sl-text">{it.text}</span>{selected && <Icon name="check" />}<FavStar it={it} kind="palFavs" inList /></>}
             onPick={it => { editSeg(seg.id, { pal: it.id }, { now: true }); setOpen(false); btn.current?.focus(); }}
           />
         </Popover>

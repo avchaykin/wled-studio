@@ -143,7 +143,7 @@ export function Popover({ anchor, onClose, children, width = 280, label }) {
 }
 
 // Searchable list with keyboard navigation (used by pickers and the command palette).
-export function SearchList({ items, onPick, placeholder, render, autoFocus = true, selectedKey, height = 320 }) {
+export function SearchList({ items, onPick, placeholder, render, autoFocus = true, selectedKey, height = 320, empty }) {
   const [q, setQ] = useState('');
   const [hi, setHi] = useState(0);
   const listRef = useRef(null), inputRef = useRef(null);
@@ -175,10 +175,19 @@ export function SearchList({ items, onPick, placeholder, render, autoFocus = tru
             onPointerMove={() => i !== hi && setHi(i)}
             onClick={e => onPick(it, e)}
           >{render ? render(it, it.key === selectedKey) : it.text}</div>
-        )) : <div class="sl-empty">No match for “{q}”</div>}
+        )) : <div class="sl-empty">{q || !empty ? `No match for “${q}”` : empty}</div>}
       </div>
     </div>
   );
 }
 
 export function Kbd({ children }) { return <kbd class="kbd">{children}</kbd>; }
+
+// Row of toggle chips (one active), e.g. All · Favourites · Scripts
+export function Chips({ options, value, onChange, label }) {
+  return (
+    <div class="filters chips" role="group" aria-label={label}>
+      {options.map(([k, text]) => <button key={k} type="button" class="filter" aria-pressed={value === k} onClick={() => onChange(k)}>{text}</button>)}
+    </div>
+  );
+}

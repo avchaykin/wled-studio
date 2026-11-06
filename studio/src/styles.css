@@ -385,3 +385,7 @@ input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px rg
 .eventlist li { display: inline-flex; align-items: center; gap: 6px; color: var(--tx2); font-size: 12px; }
 .devscripts h3.spaced { margin-top: 18px; }
 @media (hover: none) { .lib-actions { opacity: 1; } }
+.popover .chips { padding: 6px 8px; border-bottom: 1px solid var(--line); }
+.sl-item .fav.in-list { width: 24px; height: 24px; flex: none; opacity: 0; }
+.sl-item:hover .fav.in-list, .sl-item.hi .fav.in-list, .fav.in-list.on, .fav.in-list:focus-visible { opacity: 1; }
+@media (hover: none) { .sl-item .fav.in-list { opacity: 1; width: 36px; height: 36px; } }

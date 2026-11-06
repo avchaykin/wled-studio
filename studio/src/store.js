@@ -13,7 +13,8 @@ let data = {
   state: null, info: null, cat: null, online: false,
   sel: 0, page: 'lights', libTab: 'presets',
   presets: null,            // /presets.json, null until loaded
-  favs: load('studio.favs', []),
+  favs: load('studio.favs', []),        // effect ids
+  palFavs: load('studio.palfavs', []),  // palette ids
   palette: false,           // command palette open
 };
 const subs = new Set();
@@ -23,6 +24,11 @@ export function load(k, d) { try { return JSON.parse(localStorage.getItem(k)) ??
 export function persist(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch { /* private mode */ } }
 
 export const getState = () => data;
+// star / unstar an effect ('favs') or palette ('palFavs'); kept per browser
+export function toggleFav(kind, id) {
+  const cur = data[kind]; const f = cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id];
+  persist(kind === 'favs' ? 'studio.favs' : 'studio.palfavs', f); set({ [kind]: f });
+}
 export function set(patch) { data = { ...data, ...patch }; subs.forEach(fn => fn()); }
 
 // Subscribe a component to a slice; re-renders only when the selected value changes (shallow).

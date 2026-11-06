@@ -1,12 +1,13 @@
 // Library: presets, effects and palettes for the selected segment.
 import { useState, useRef } from 'preact/hooks';
-import { useStore, selSeg, editSeg, set, persist, glowFx, command, presetList, savePreset, deletePreset, renamePreset } from './store.js';
-import { IconButton, DeleteButton } from './ui.jsx';
+import { useStore, selSeg, editSeg, set, glowFx, command, presetList, savePreset, deletePreset, renamePreset } from './store.js';
+import { IconButton, DeleteButton, Chips } from './ui.jsx';
 import { Icon } from './icons.jsx';
-import { effectItems, FxTags } from './inspector.jsx';
+import { effectItems, paletteItems, FxTags, FavStar } from './inspector.jsx';
 import { paletteCss } from './lib.js';
 
 const FILTERS = [['all', 'All'], ['fav', 'Favourites'], ['glow', 'Scripts'], ['audio', 'Audio'], ['2d', '2D']];
+const PAL_FILTERS = [['all', 'All'], ['fav', 'Favourites']];
 const TABS = [['presets', 'Presets'], ['effects', 'Effects'], ['palettes', 'Palettes']];
 
 export function Library() {
@@ -14,6 +15,7 @@ export function Library() {
   const cat = useStore(d => d.cat);
   const seg = useStore(d => selSeg(d));
   const favs = useStore(d => d.favs);
+  const palFavs = useStore(d => d.palFavs);
   useStore(d => d.info?.glow?.slots?.length ?? 0);
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState('all');
@@ -29,7 +31,7 @@ export function Library() {
   const tabs = (
     <div class="seg-tabs" role="tablist" aria-label="Library">
       {TABS.map(([k, label]) => (
-        <button key={k} type="button" role="tab" aria-selected={tab === k} class="seg-tab" onClick={() => { set({ libTab: k }); setQ(''); }}>{label}</button>
+        <button key={k} type="button" role="tab" aria-selected={tab === k} class="seg-tab" onClick={() => { set({ libTab: k }); setQ(''); setFilter('all'); }}>{label}</button>
       ))}
     </div>
   );
@@ -41,11 +43,10 @@ export function Library() {
     rows = effectItems(cat, glowFx(), favs).filter(it => (!ql || it.text.toLowerCase().includes(ql)) && (filter === 'all'
       || (filter === 'fav' && it.fav) || (filter === 'glow' && it.glow) || (filter === 'audio' && it.m.audio) || (filter === '2d' && it.m.twoD)));
   } else {
-    rows = (cat?.palettes ?? []).map((text, id) => ({ key: id, id, text })).filter(it => !ql || it.text.toLowerCase().includes(ql));
+    rows = paletteItems(cat, palFavs).filter(it => (!ql || it.text.toLowerCase().includes(ql)) && (filter !== 'fav' || it.fav));
   }
   const current = tab === 'effects' ? seg?.fx : seg?.pal;
   const apply = it => seg && editSeg(seg.id, tab === 'effects' ? { fx: it.id, fxdef: true } : { pal: it.id }, { now: true });
-  const toggleFav = id => { const f = favs.includes(id) ? favs.filter(x => x !== id) : [...favs, id]; persist('studio.favs', f); set({ favs: f }); };
 
   return (
     <section class="library" aria-label="Library">
@@ -54,11 +55,7 @@ export function Library() {
         <div class="searchbox compact"><Icon name="search" />
           <input value={q} placeholder={tab === 'effects' ? 'Filter effects' : 'Filter palettes'} aria-label="Filter" spellcheck={false} onInput={e => setQ(e.currentTarget.value)} />
         </div>
-        {tab === 'effects' && (
-          <div class="filters" role="group" aria-label="Effect filters">
-            {FILTERS.map(([k, label]) => <button key={k} type="button" class="filter" aria-pressed={filter === k} onClick={() => setFilter(k)}>{label}</button>)}
-          </div>
-        )}
+        <Chips label={tab === 'effects' ? 'Effect filters' : 'Palette filters'} options={tab === 'effects' ? FILTERS : PAL_FILTERS} value={filter} onChange={setFilter} />
       </div>
       <div class={`lib-list ${tab}`} ref={listRef} onKeyDown={onKey}>
         {rows.length ? rows.map(it => (
@@ -68,16 +65,12 @@ export function Library() {
               <span class="lib-name">{it.text}</span>
               {tab === 'effects' && <FxTags it={it} />}
             </button>
-            {tab === 'effects' && (
-              <button type="button" class={`fav${it.fav ? ' on' : ''}`} aria-pressed={it.fav} aria-label={it.fav ? `Remove ${it.text} from favourites` : `Add ${it.text} to favourites`} onClick={() => toggleFav(it.id)}>
-                <Icon name="star" fill={it.fav} />
-              </button>
-            )}
+            <FavStar it={it} kind={tab === 'effects' ? 'favs' : 'palFavs'} />
           </div>
         )) : !cat ? (
           <p class="lib-empty">Loading {tab}…</p>
         ) : (
-          <p class="lib-empty">{filter === 'fav' && !ql ? 'Star effects to pin them here and to the top of every list.' : filter === 'glow' && !ql ? 'No scripts on this device yet. Write one in Scripts.' : `Nothing matches “${q}”.`}</p>
+          <p class="lib-empty">{filter === 'fav' && !ql ? (tab === 'effects' ? 'Star effects to pin them here and to the top of every list.' : 'Star palettes to list them here.') : filter === 'glow' && !ql ? 'No scripts on this device yet. Write one in Scripts.' : `Nothing matches “${q}”.`}</p>
         )}
       </div>
     </section>

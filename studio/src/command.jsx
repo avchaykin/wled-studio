@@ -3,7 +3,7 @@ import { useEffect, useRef } from 'preact/hooks';
 import { useStore, set, getState, selSeg, editSeg, editTop, command, glowFx, loadPresets, presetList } from './store.js';
 import { SearchList, Kbd } from './ui.jsx';
 import { Icon } from './icons.jsx';
-import { effectItems, FxTags } from './inspector.jsx';
+import { effectItems, paletteItems, FxTags } from './inspector.jsx';
 import { paletteCss } from './lib.js';
 import { splitSegment, deleteSegment } from './timeline.jsx';
 
@@ -30,7 +30,7 @@ export function CommandPalette() {
     ...(d.state?.seg ?? []).filter(s => s.stop > s.start).map(s => ({ key: `s-${s.id}`, group: 'Segment', text: `Select ${s.n || `segment ${s.id}`}`, icon: 'grid', run: () => set({ sel: s.id }) })),
     ...presetList(d.presets).map(p => ({ key: `p-${p.id}`, group: 'Preset', text: p.name, icon: 'presets', run: () => command({ ps: p.id }) })),
     ...(seg ? effectItems(d.cat, glowFx(d), d.favs).map(it => ({ ...it, key: `e-${it.id}`, group: 'Effect', run: () => editSeg(seg.id, { fx: it.id, fxdef: true }, { now: true }) })) : []),
-    ...(seg ? (d.cat?.palettes ?? []).map((text, id) => ({ key: `l-${id}`, id, group: 'Palette', text, run: () => editSeg(seg.id, { pal: id }, { now: true }) })) : []),
+    ...(seg ? paletteItems(d.cat, d.palFavs).map(it => ({ key: `l-${it.id}`, id: it.id, group: 'Palette', text: it.text, run: () => editSeg(seg.id, { pal: it.id }, { now: true }) })) : []),
   ].filter(Boolean);
 
   return (
