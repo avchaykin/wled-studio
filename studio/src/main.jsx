@@ -9,10 +9,11 @@ import { Inspector } from './inspector.jsx';
 import { Library } from './library.jsx';
 import { CommandPalette } from './command.jsx';
 import { PaletteEditor } from './palette-editor.jsx';
+import { DevicesPage } from './devices.jsx';
 import { ScriptsPage, SettingsPage, checkForUpdate } from './pages.jsx';
 import { isMac } from './lib.js';
 
-const PAGES = [['lights', 'Lights', 'lights'], ['scripts', 'Scripts', 'code'], ['settings', 'Settings', 'settings']];
+const PAGES = [['lights', 'Lights', 'lights'], ['devices', 'Devices', 'device'], ['scripts', 'Scripts', 'code'], ['settings', 'Settings', 'settings']];
 
 function TopBar() {
   const { name, online, on, bri, ip } = useStore(d => ({ name: d.info?.name, online: d.online, on: d.state?.on, bri: d.state?.bri, ip: d.info?.ip }));
@@ -83,6 +84,7 @@ function App() {
       <main class="main" id="main">
         {error && <div class="banner error" role="alert">Can't reach the device: {error}. Retrying in the background.</div>}
         {page === 'lights' && <Lights />}
+        {page === 'devices' && <DevicesPage />}
         {page === 'scripts' && <ScriptsPage />}
         {page === 'settings' && <SettingsPage />}
       </main>
@@ -126,7 +128,7 @@ function shortcuts(e) {
     }
     case 'Backspace': case 'Delete': if (d.page === 'lights' && seg) deleteSegment(seg); break;
     case 'p': case 'P': editTop({ on: !d.state?.on }, { now: true }); break;
-    case '1': case '2': case '3': location.hash = PAGES[+e.key - 1][0]; break;
+    case '1': case '2': case '3': case '4': location.hash = PAGES[+e.key - 1][0]; break;
     default: return;
   }
   e.preventDefault();

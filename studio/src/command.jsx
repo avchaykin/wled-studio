@@ -26,6 +26,7 @@ export function CommandPalette() {
     seg && { key: 'a-split', group: 'Action', text: 'Split selected segment in half', icon: 'split', run: () => splitSegment(seg, Math.floor((seg.start + seg.stop) / 2)) },
     seg && { key: 'a-del', group: 'Action', text: 'Delete selected segment', icon: 'trash', run: () => deleteSegment(seg) },
     { key: 'g-presets', group: 'Go to', text: 'Presets', icon: 'presets', run: () => { set({ libTab: 'presets' }); location.hash = 'lights'; } },
+    { key: 'g-devices', group: 'Go to', text: 'Devices', icon: 'device', run: () => { location.hash = 'devices'; } },
     { key: 'g-scripts', group: 'Go to', text: 'Scripts', icon: 'code', run: () => { location.hash = 'scripts'; } },
     { key: 'g-settings', group: 'Go to', text: 'Settings', icon: 'settings', run: () => { location.hash = 'settings'; } },
     ...(d.state?.seg ?? []).filter(s => s.stop > s.start).map(s => ({ key: `s-${s.id}`, group: 'Segment', text: `Select ${s.n || `segment ${s.id}`}`, icon: 'grid', run: () => set({ sel: s.id }) })),
