@@ -44,7 +44,7 @@ def main():
     if not os.path.isdir(os.path.join(RELEASES, ".git")):
         sys.exit(f"release repo clone not found at {RELEASES} (set RELEASES_REPO)")
     # the two files this script regenerates may differ from a previous (dry) run
-    generated = ("wled00/studio_version.h", "wled00/html_studio.h")
+    generated = ("wled00/studio_version.h",)
     dirty = [l for l in git_out("status", "--porcelain").splitlines() if not l.startswith("??") and l[3:] not in generated]
     if dirty and not a.dry_run:
         sys.exit("source tree has uncommitted changes:\n" + "\n".join(dirty))
@@ -83,7 +83,7 @@ def main():
     json.dump(manifest, open(manifest_path, "w"), indent=1)
     open(manifest_path, "a").write("\n")
 
-    run("git", "add", "wled00/studio_version.h", "wled00/html_studio.h")
+    run("git", "add", "wled00/studio_version.h")  # html_studio.h is generated and git-ignored
     if git_out("diff", "--cached", "--name-only"):
         run("git", "commit", "-m", f"Release {a.version}\n\nCo-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>")
     run("git", "tag", "-a", f"v{a.version}", "-m", f"WLED Studio {a.version}")
