@@ -22,6 +22,7 @@ export function CommandPalette() {
   const close = () => { dlg.current?.close?.(); set({ palette: false }); };
   const items = [
     { key: 'a-power', group: 'Action', text: d.state?.on ? 'Turn lights off' : 'Turn lights on', icon: 'power', kbd: 'P', run: () => editTop({ on: !d.state?.on }, { now: true }) },
+    seg && seg.fx !== 0 && { key: 'a-solid', group: 'Action', text: 'Solid colour (no effect)', icon: 'dot', run: () => editSeg(seg.id, { fx: 0, fxdef: true }, { now: true }) },
     seg && { key: 'a-split', group: 'Action', text: 'Split selected segment in half', icon: 'split', run: () => splitSegment(seg, Math.floor((seg.start + seg.stop) / 2)) },
     seg && { key: 'a-del', group: 'Action', text: 'Delete selected segment', icon: 'trash', run: () => deleteSegment(seg) },
     { key: 'g-presets', group: 'Go to', text: 'Presets', icon: 'presets', run: () => { set({ libTab: 'presets' }); location.hash = 'lights'; } },

@@ -416,3 +416,6 @@ input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px rg
 .pe-fields .hexfield { width: 100px; }
 .pe-err { margin: 0 14px 8px; color: #ffb3b5; }
 @media (max-width: 560px) { .pe-stopedit { grid-template-columns: 1fr; } .pe-stop { width: 22px; height: 22px; margin-left: -11px; } .pe-track { height: 30px; } }
+.seg-tabs.mode { display: flex; margin-bottom: 8px; }
+.seg-tabs.mode .seg-tab { flex: 1; }
+.picker .tags { margin-left: 0; }

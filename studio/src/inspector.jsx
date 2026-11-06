@@ -33,7 +33,8 @@ export function Inspector() {
       </header>
 
       <Section title="Effect">
-        <EffectField seg={seg} cat={cat} />
+        <EffectMode seg={seg} cat={cat} />
+        {seg.fx !== 0 && <EffectField seg={seg} cat={cat} />}
         {m.sliders.map(s => <Slider key={`${seg.id}${s.key}`} label={s.label} value={seg[s.key] ?? 128} onChange={v => ed({ [s.key]: v })} />)}
         {m.checks.length > 0 && <div class="switches">{m.checks.map(c => <Switch key={c.key} label={c.label} checked={seg[c.key]} onChange={v => editSeg(seg.id, { [c.key]: v }, { now: true })} />)}</div>}
       </Section>
@@ -105,8 +106,8 @@ export function effectItems(cat, glow, favs) {
 }
 function buildEffectItems(cat, glow, favs) {
   return (cat?.effects ?? []).map((name, id) => ({ key: id, text: name, id, m: fxMeta(id, cat), glow: glow.has(id), fav: favs.includes(id) }))
-    .filter(e => e.text && e.text !== 'RSVD' && !e.text.startsWith('-'))
-    .sort((a, b) => (a.id === 0 ? -1 : b.id === 0 ? 1 : (b.fav - a.fav) || a.text.localeCompare(b.text)));
+    .filter(e => e.id !== 0 && e.text && e.text !== 'RSVD' && !e.text.startsWith('-')) // Solid is its own mode
+    .sort((a, b) => (b.fav - a.fav) || a.text.localeCompare(b.text));
 }
 // Palettes: the six that are built from the segment colours (Default … Colors Only) stay
 // on top in device order; the rest are alphabetical.
@@ -141,24 +142,57 @@ export function FxTags({ it }) {
   );
 }
 
+// Solid colour vs animated effect. Switching back to Effect restores the segment's last effect.
+const lastFx = new Map(); // segment id -> last non-solid effect
+const FALLBACK_FX = 9;     // Rainbow
+function EffectMode({ seg, cat }) {
+  useEffect(() => { if (seg.fx !== 0) lastFx.set(seg.id, seg.fx); }, [seg.id, seg.fx]);
+  const solid = seg.fx === 0;
+  const pick = mode => {
+    if ((mode === 'solid') === solid) return;
+    const fx = mode === 'solid' ? 0 : lastFx.get(seg.id) ?? (cat?.effects?.[FALLBACK_FX] ? FALLBACK_FX : 1);
+    editSeg(seg.id, { fx, fxdef: true }, { now: true });
+  };
+  return (
+    <div class="seg-tabs mode" role="tablist" aria-label="Segment mode">
+      {[['solid', 'Solid colour'], ['effect', 'Effect']].map(([k, label]) => (
+        <button key={k} type="button" role="tab" class="seg-tab" aria-selected={(k === 'solid') === solid} onClick={() => pick(k)}>{label}</button>
+      ))}
+    </div>
+  );
+}
+
+const FX_FILTERS = [['all', 'All'], ['fav', 'Favourites'], ['glow', 'Scripts'], ['audio', 'Audio'], ['2d', '2D']];
+const fxFilter = { all: () => true, fav: it => it.fav, glow: it => it.glow, audio: it => it.m.audio, '2d': it => it.m.twoD };
+
 function EffectField({ seg, cat }) {
   const btn = useRef(null);
   const [open, setOpen] = useState(false);
+  const [filter, setFilter] = useState('all');
   useStore(d => d.info?.glow?.slots?.length ?? 0); // re-render when scripts change
   const glow = glowFx();
   const favs = useStore(d => d.favs);
+  const all = effectItems(cat, glow, favs);
+  const cur = all.find(it => it.id === seg.fx);
   const name = cat?.effects?.[seg.fx] ?? `Effect ${seg.fx}`;
+  const counts = { fav: all.filter(fxFilter.fav).length, glow: all.filter(fxFilter.glow).length };
+  const options = FX_FILTERS.filter(([k]) => k === 'all' || k === 'fav' || all.some(fxFilter[k])) // hide empty categories
+    .map(([k, label]) => [k, counts[k] ? `${label} ${counts[k]}` : label]);
+  const empty = { fav: 'Star effects to list them here.', glow: 'No scripts on this device yet. Write one in Scripts.' }[filter];
   return (
     <>
       <button ref={btn} type="button" class="picker" onClick={() => setOpen(o => !o)} aria-haspopup="dialog" aria-expanded={open}>
-        <span class="picker-value">{name}</span><Icon name="chevron" />
+        <span class="picker-value">{name}</span>
+        {cur && <FxTags it={cur} />}
+        <Icon name="chevron" />
       </button>
       {open && (
-        <Popover anchor={btn.current} onClose={() => setOpen(false)} width={300} label="Choose effect">
+        <Popover anchor={btn.current} onClose={() => setOpen(false)} width={340} label="Choose effect">
+          <Chips label="Effect filter" value={filter} onChange={setFilter} options={options} />
           <SearchList
-            placeholder="Search effects" selectedKey={seg.fx}
-            items={effectItems(cat, glow, favs)}
-            render={(it, selected) => <><span class="sl-text">{it.text}</span><FxTags it={it} />{selected && <Icon name="check" />}</>}
+            key={filter} placeholder="Search effects" selectedKey={seg.fx} height={360}
+            items={all.filter(fxFilter[filter])} empty={empty}
+            render={(it, selected) => <><span class="sl-text">{it.text}</span><FxTags it={it} />{selected && <Icon name="check" />}<FavStar it={it} kind="favs" inList /></>}
             onPick={it => { editSeg(seg.id, { fx: it.id, fxdef: true }, { now: true }); setOpen(false); btn.current?.focus(); }}
           />
         </Popover>

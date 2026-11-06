@@ -1,23 +1,20 @@
-// Library: presets, effects and palettes for the selected segment.
+// Library: presets and palettes (effects are picked in the inspector).
 import { useState, useRef } from 'preact/hooks';
-import { useStore, selSeg, editSeg, set, glowFx, command, presetList, savePreset, deletePreset, renamePreset } from './store.js';
+import { useStore, selSeg, editSeg, set, command, presetList, savePreset, deletePreset, renamePreset } from './store.js';
 import { IconButton, DeleteButton, Chips } from './ui.jsx';
 import { Icon } from './icons.jsx';
-import { effectItems, paletteItems, FxTags, FavStar } from './inspector.jsx';
+import { paletteItems, FavStar } from './inspector.jsx';
 import { paletteCss } from './lib.js';
 import { editPalette } from './palette-editor.jsx';
 
-const FILTERS = [['all', 'All'], ['fav', 'Favourites'], ['glow', 'Scripts'], ['audio', 'Audio'], ['2d', '2D']];
 const PAL_FILTERS = [['all', 'All'], ['fav', 'Favourites']];
-const TABS = [['presets', 'Presets'], ['effects', 'Effects'], ['palettes', 'Palettes']];
+const TABS = [['presets', 'Presets'], ['palettes', 'Palettes']];
 
 export function Library() {
   const tab = useStore(d => d.libTab);
   const cat = useStore(d => d.cat);
   const seg = useStore(d => selSeg(d));
-  const favs = useStore(d => d.favs);
   const palFavs = useStore(d => d.palFavs);
-  useStore(d => d.info?.glow?.slots?.length ?? 0);
   const [q, setQ] = useState('');
   const [filter, setFilter] = useState('all');
   const listRef = useRef(null);
@@ -36,41 +33,33 @@ export function Library() {
       ))}
     </div>
   );
-  if (tab === 'presets') return <PresetsPanel tabs={tabs} listRef={listRef} onKey={onKey} />;
+  if (tab !== 'palettes') return <PresetsPanel tabs={tabs} listRef={listRef} onKey={onKey} />;
 
   const ql = q.trim().toLowerCase();
-  let rows;
-  if (tab === 'effects') {
-    rows = effectItems(cat, glowFx(), favs).filter(it => (!ql || it.text.toLowerCase().includes(ql)) && (filter === 'all'
-      || (filter === 'fav' && it.fav) || (filter === 'glow' && it.glow) || (filter === 'audio' && it.m.audio) || (filter === '2d' && it.m.twoD)));
-  } else {
-    rows = paletteItems(cat, palFavs).filter(it => (!ql || it.text.toLowerCase().includes(ql)) && (filter !== 'fav' || it.fav));
-  }
-  const current = tab === 'effects' ? seg?.fx : seg?.pal;
-  const apply = it => seg && editSeg(seg.id, tab === 'effects' ? { fx: it.id, fxdef: true } : { pal: it.id }, { now: true });
+  const rows = paletteItems(cat, palFavs).filter(it => (!ql || it.text.toLowerCase().includes(ql)) && (filter !== 'fav' || it.fav));
+  const apply = it => seg && editSeg(seg.id, { pal: it.id }, { now: true });
 
   return (
     <section class="library" aria-label="Library">
       <div class="lib-bar">
         {tabs}
         <div class="searchbox compact"><Icon name="search" />
-          <input value={q} placeholder={tab === 'effects' ? 'Filter effects' : 'Filter palettes'} aria-label="Filter" spellcheck={false} onInput={e => setQ(e.currentTarget.value)} />
+          <input value={q} placeholder="Filter palettes" aria-label="Filter palettes" spellcheck={false} onInput={e => setQ(e.currentTarget.value)} />
         </div>
-        <Chips label={tab === 'effects' ? 'Effect filters' : 'Palette filters'} options={tab === 'effects' ? FILTERS : PAL_FILTERS} value={filter} onChange={setFilter} />
-        {tab === 'palettes' && cat && (
+        <Chips label="Palette filters" options={PAL_FILTERS} value={filter} onChange={setFilter} />
+        {cat && (
           <button type="button" class="btn lib-new" title="Start from the selected segment's palette"
             onClick={() => editPalette({ name: `${paletteItems(cat, palFavs).find(it => it.id === seg?.pal)?.text?.replace(/^\* /, '') ?? 'New'} copy`, seed: cat.palx[seg?.pal ?? 0], cols: seg?.col })}>
             <Icon name="plus" />New palette
           </button>
         )}
       </div>
-      <div class={`lib-list ${tab}`} ref={listRef} onKeyDown={onKey}>
+      <div class="lib-list palettes" ref={listRef} onKeyDown={onKey}>
         {rows.length ? rows.map(it => (
-          <div key={it.key} class={`lib-row${it.id === current ? ' current' : ''}`}>
-            <button type="button" class="lib-apply" onClick={() => apply(it)} aria-current={it.id === current ? 'true' : undefined}>
-              {tab === 'palettes' && <span class="swatchbar" style={{ background: paletteCss(cat.palx[it.id], seg?.col) }} />}
+          <div key={it.key} class={`lib-row${it.id === seg?.pal ? ' current' : ''}`}>
+            <button type="button" class="lib-apply" onClick={() => apply(it)} aria-current={it.id === seg?.pal ? 'true' : undefined}>
+              <span class="swatchbar" style={{ background: paletteCss(cat.palx[it.id], seg?.col) }} />
               <span class="lib-name">{it.text}</span>
-              {tab === 'effects' && <FxTags it={it} />}
               {it.custom != null && <span class="tags"><span class="tag">Custom</span></span>}
             </button>
             {it.custom != null && (
@@ -78,12 +67,10 @@ export function Library() {
                 <IconButton icon="pencil" label={`Edit ${it.text}`} onClick={() => editPalette({ idx: it.custom, name: it.text, seed: cat.palx[it.id] })} />
               </span>
             )}
-            <FavStar it={it} kind={tab === 'effects' ? 'favs' : 'palFavs'} />
+            <FavStar it={it} kind="palFavs" />
           </div>
-        )) : !cat ? (
-          <p class="lib-empty">Loading {tab}…</p>
-        ) : (
-          <p class="lib-empty">{filter === 'fav' && !ql ? (tab === 'effects' ? 'Star effects to pin them here and to the top of every list.' : 'Star palettes to list them here.') : filter === 'glow' && !ql ? 'No scripts on this device yet. Write one in Scripts.' : `Nothing matches “${q}”.`}</p>
+        )) : (
+          <p class="lib-empty">{!cat ? 'Loading palettes…' : filter === 'fav' && !ql ? 'Star palettes to list them here.' : `Nothing matches “${q}”.`}</p>
         )}
       </div>
     </section>
