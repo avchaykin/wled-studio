@@ -419,3 +419,18 @@ input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px rg
 .seg-tabs.mode { display: flex; margin-bottom: 8px; }
 .seg-tabs.mode .seg-tab { flex: 1; }
 .picker .tags { margin-left: 0; }
+
+/* cards (firmware update, devices) */
+.card { border: 1px solid var(--line); border-radius: 8px; background: var(--panel); padding: 12px 14px; margin-bottom: 20px; }
+.card-head { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+.card-head .btn { margin-left: auto; height: 24px; font-size: 12px; }
+.update-line { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; }
+.tag.ok { color: var(--ok); background: rgb(62 207 142 / .12); }
+.notes { margin: 0 0 12px; padding-left: 18px; color: var(--tx2); }
+.notes li { margin: 2px 0; }
+.small { font-size: 11px; margin: 8px 0 0; }
+.progress { display: flex; flex-direction: column; gap: 6px; }
+.progress .bar { height: 6px; border-radius: 3px; background: var(--raised); overflow: hidden; }
+.progress .bar > span { display: block; height: 100%; background: var(--acc); transition: width .2s; }
+.rail-item { position: relative; }
+.rail-badge { position: absolute; top: 6px; right: 12px; width: 7px; height: 7px; border-radius: 50%; background: var(--acc); box-shadow: 0 0 0 2px var(--panel); }

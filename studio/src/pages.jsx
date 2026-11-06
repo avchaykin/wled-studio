@@ -5,6 +5,7 @@ import { Button, IconButton, DeleteButton, Kbd } from './ui.jsx';
 import { Icon } from './icons.jsx';
 import { paletteStops, paletteAt } from './lib.js';
 import { loadGlow } from './glow.js';
+import { fetchManifest, updateFor, updateDevice, studioVersion } from './update.js';
 import EXAMPLES from './examples.gen.js';
 
 // ---------------------------------------------------------------- Scripts
@@ -208,7 +209,7 @@ const LINKS = [['/settings/wifi', 'Wi-Fi'], ['/settings/leds', 'LED hardware'], 
 
 export function SettingsPage() {
   const info = useStore(d => d.info);
-  const rows = info ? [['Firmware', info.ver], ['Name', info.name], ['LEDs', info.leds?.count], ['Frame rate', `${info.leds?.fps ?? '—'} fps`],
+  const rows = info ? [['WLED Studio', studioVersion(info) ?? '—'], ['WLED core', `${info.ver} (${info.release})`], ['Name', info.name], ['LEDs', info.leds?.count], ['Frame rate', `${info.leds?.fps ?? '—'} fps`],
     ['Free memory', `${Math.round((info.freeheap ?? 0) / 1024)} KB`], ['Wi-Fi signal', `${info.wifi?.signal ?? '—'}%`],
     ['Uptime', `${Math.floor((info.uptime ?? 0) / 3600)} h ${Math.floor(((info.uptime ?? 0) % 3600) / 60)} min`],
     ['Script engine', info.glow ? `v${info.glow.v} · ${info.glow.slots.length} loaded` : 'Not installed']] : [];
@@ -216,11 +217,69 @@ export function SettingsPage() {
     <div class="page">
       <header class="page-head"><h2>Settings</h2></header>
       <div class="settings-grid">
-        <dl class="kv">{rows.map(([k, v]) => [<dt key={`${k}t`}>{k}</dt>, <dd key={`${k}d`}>{v ?? '—'}</dd>])}</dl>
+        <div>
+          <UpdateCard />
+          <dl class="kv">{rows.map(([k, v]) => [<dt key={`${k}t`}>{k}</dt>, <dd key={`${k}d`}>{v ?? '—'}</dd>])}</dl>
+        </div>
         <nav class="linklist" aria-label="Device settings">
           {LINKS.map(([href, label]) => <a key={href} href={href}>{label}<Icon name="chevron" /></a>)}
         </nav>
       </div>
     </div>
+  );
+}
+
+// Checks the release list once per session (cached a few hours) and flags Settings in the rail.
+export async function checkForUpdate(force = false) {
+  const info = getState().info;
+  try { const rel = updateFor(info, await fetchManifest(force)); set({ update: rel, updateErr: '' }); return rel; }
+  catch (e) { set({ updateErr: e.message }); return null; }
+}
+
+const PHASE = { download: 'Downloading', upload: 'Sending to the device', reboot: 'Restarting', done: 'Updated' };
+function UpdateCard() {
+  const info = useStore(d => d.info);
+  const rel = useStore(d => d.update);
+  const err = useStore(d => d.updateErr);
+  const [checking, setChecking] = useState(false);
+  const [step, setStep] = useState(null); // { phase, p } while updating
+  const [fail, setFail] = useState('');
+  const cur = studioVersion(info);
+  const check = async () => { setChecking(true); await checkForUpdate(true); setChecking(false); };
+  const run = async () => {
+    setFail(''); setStep({ phase: 'download', p: 0 });
+    try { await updateDevice('', rel, setStep); setTimeout(() => location.reload(), 1200); }
+    catch (e) { setFail(e.message); setStep(null); }
+  };
+  const busy = !!step && step.phase !== 'done';
+  return (
+    <section class="card update-card" aria-label="Firmware update">
+      <header class="card-head">
+        <h3>Firmware</h3>
+        <button type="button" class="btn ghost" onClick={check} disabled={checking || busy}>{checking ? 'Checking…' : 'Check for updates'}</button>
+      </header>
+      <p class="update-line">
+        <span>WLED Studio <strong>{cur ?? 'not installed'}</strong></span>
+        {rel && !rel.newer && <span class="tag ok">Up to date</span>}
+        {rel?.newer && <span class="tag accent">{rel.version} available</span>}
+      </p>
+      {err && !rel && <p class="muted">Could not check for updates: {err}</p>}
+      {!err && !rel && info && <p class="muted">{checking ? 'Checking…' : `No published build for ${info.release} yet.`}</p>}
+      {rel?.newer && (
+        <>
+          {rel.notes?.length > 0 && <ul class="notes">{rel.notes.map(n => <li key={n}>{n}</li>)}</ul>}
+          {step ? (
+            <div class="progress" role="status" aria-live="polite">
+              <span>{PHASE[step.phase]}{step.p != null && step.phase !== 'reboot' && step.phase !== 'done' ? ` ${Math.round(step.p * 100)}%` : '…'}</span>
+              <span class="bar"><span style={{ width: `${step.phase === 'download' ? step.p * 50 : step.phase === 'upload' ? 50 + step.p * 45 : 100}%` }} /></span>
+            </div>
+          ) : (
+            <Button primary icon="upload" onClick={run}>Update to {rel.version}</Button>
+          )}
+          <p class="muted small">{busy ? 'Keep this page open. The lights restart once the update is written; settings, presets and scripts stay.' : `${(rel.build.size / 1048576).toFixed(1)} MB · released ${rel.date ?? ''}`}</p>
+        </>
+      )}
+      {fail && <p class="error" role="alert">{fail}</p>}
+    </section>
   );
 }

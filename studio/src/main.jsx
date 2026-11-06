@@ -9,7 +9,7 @@ import { Inspector } from './inspector.jsx';
 import { Library } from './library.jsx';
 import { CommandPalette } from './command.jsx';
 import { PaletteEditor } from './palette-editor.jsx';
-import { ScriptsPage, SettingsPage } from './pages.jsx';
+import { ScriptsPage, SettingsPage, checkForUpdate } from './pages.jsx';
 import { isMac } from './lib.js';
 
 const PAGES = [['lights', 'Lights', 'lights'], ['scripts', 'Scripts', 'code'], ['settings', 'Settings', 'settings']];
@@ -37,11 +37,13 @@ function TopBar() {
 }
 
 function Rail({ page }) {
+  const upd = useStore(d => !!d.update?.newer);
   return (
     <nav class="rail" aria-label="Sections">
       {PAGES.map(([k, label, icon]) => (
         <a key={k} href={`#${k}`} class="rail-item" aria-current={page === k ? 'page' : undefined} title={label}>
           <Icon name={icon} size={18} /><span>{label}</span>
+          {k === 'settings' && upd && <span class="rail-badge" role="img" aria-label="Update available" />}
         </a>
       ))}
     </nav>
@@ -70,7 +72,7 @@ function App() {
       set({ page: PAGES.some(p => p[0] === k) ? k : 'lights' });
     };
     addEventListener('hashchange', fromHash); fromHash();
-    boot().catch(e => setError(e.message));
+    boot().then(() => checkForUpdate()).catch(e => setError(e.message));
     addEventListener('keydown', shortcuts);
     return () => { removeEventListener('hashchange', fromHash); removeEventListener('keydown', shortcuts); };
   }, []);

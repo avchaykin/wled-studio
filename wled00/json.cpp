@@ -1,4 +1,5 @@
 #include "wled.h"
+#include "studio_version.h"
 
 #define JSON_PATH_STATE      1
 #define JSON_PATH_INFO       2
@@ -712,6 +713,7 @@ void serializeInfo(JsonObject root)
   root[F("vid")] = VERSION;
   root[F("cn")] = F(WLED_CODENAME);
   root[F("release")] = releaseString;
+  root[F("studio")] = F(STUDIO_VERSION); // WLED Studio release, see studio_version.h
   root[F("repo")] = repoString;
 #if !defined(ARDUINO_ARCH_ESP32) || (ESP_IDF_VERSION < ESP_IDF_VERSION_VAL(6, 0, 0)) // ToDO: verify that this works correctly in V5
   root[F("deviceId")] = getDeviceId();
