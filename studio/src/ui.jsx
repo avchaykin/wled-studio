@@ -72,6 +72,25 @@ export function IconButton({ icon, label, onClick, pressed, kbd, disabled, tone 
   );
 }
 
+// Two-step delete: the first click arms the button ("Delete?"), a second click within 3 s
+// deletes. Deleting on the device cannot be undone.
+export function DeleteButton({ name, onDelete }) {
+  const [armed, setArmed] = useState(false);
+  const ref = useRef(null);
+  useEffect(() => {
+    if (!armed) return;
+    ref.current?.focus();
+    const t = setTimeout(() => setArmed(false), 3000);
+    return () => clearTimeout(t);
+  }, [armed]);
+  if (!armed) return <IconButton icon="trash" label={`Delete ${name}`} tone="danger" onClick={() => setArmed(true)} />;
+  return (
+    <button type="button" ref={ref} class="btn confirm-del" aria-label={`Confirm: delete ${name}`}
+      onClick={() => { setArmed(false); onDelete(); }} onBlur={() => setArmed(false)}
+      onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); setArmed(false); } }}>Delete?</button>
+  );
+}
+
 export function Button({ children, onClick, primary, type = 'button', disabled, icon }) {
   return (
     <button type={type} class={`btn${primary ? ' primary' : ''}`} onClick={onClick} disabled={disabled}>

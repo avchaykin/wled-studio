@@ -1,56 +1,11 @@
-// Presets, Scripts and Settings pages.
+// Scripts and Settings pages.
 import { useEffect, useRef, useState } from 'preact/hooks';
-import { useStore, getState, selSeg, command, editSeg, getJson, postJson, getText, upload, set } from './store.js';
-import { Button, IconButton, Kbd } from './ui.jsx';
+import { useStore, getState, selSeg, editSeg, getJson, postJson, getText, upload, set } from './store.js';
+import { Button, IconButton, DeleteButton, Kbd } from './ui.jsx';
 import { Icon } from './icons.jsx';
 import { paletteStops, paletteAt } from './lib.js';
 import { loadGlow } from './glow.js';
 import EXAMPLES from './examples.gen.js';
-
-// ---------------------------------------------------------------- Presets
-export function PresetsPage() {
-  const ps = useStore(d => d.state?.ps);
-  const [presets, setPresets] = useState(null);
-  const [err, setErr] = useState('');
-  const [name, setName] = useState('');
-  const load = () => getJson('/presets.json').then(p => { setPresets(p); setErr(''); }).catch(e => { setErr(e.message); setPresets({}); });
-  useEffect(() => { load(); }, []);
-  const list = Object.entries(presets ?? {}).filter(([id, p]) => +id > 0 && p && p.n !== undefined)
-    .map(([id, p]) => ({ id: +id, name: p.n || `Preset ${id}`, playlist: !!p.playlist, segs: (p.seg ?? []).filter(s => (s.stop ?? 1) > (s.start ?? 0)).length }))
-    .sort((a, b) => a.id - b.id);
-  const save = async e => {
-    e.preventDefault();
-    const n = name.trim(); if (!n) return;
-    let id = 1; while (presets?.[id]) id++;
-    await postJson('/json/state', { psave: id, n, ib: true, sb: true });
-    setName(''); setTimeout(load, 400);
-  };
-  return (
-    <div class="page">
-      <header class="page-head"><h2>Presets</h2><span class="muted">{list.length} saved</span></header>
-      {err && <p class="error">Could not load presets: {err}</p>}
-      <form class="inline-form" onSubmit={save}>
-        <input value={name} onInput={e => setName(e.currentTarget.value)} placeholder="Name for the current look" aria-label="Preset name" maxLength={32} />
-        <Button type="submit" primary icon="plus" disabled={!name.trim()}>Save current</Button>
-      </form>
-      {presets === null ? <p class="muted">Loading…</p> : list.length ? (
-        <table class="table">
-          <thead><tr><th class="num">ID</th><th>Name</th><th>Type</th><th aria-label="Actions" /></tr></thead>
-          <tbody>
-            {list.map(p => (
-              <tr key={p.id} class={ps === p.id ? 'current' : ''}>
-                <td class="num">{p.id}</td>
-                <td>{p.name}</td>
-                <td class="muted">{p.playlist ? 'Playlist' : p.segs ? `${p.segs} segment${p.segs > 1 ? 's' : ''}` : 'State'}</td>
-                <td class="right"><Button onClick={() => command({ ps: p.id })} icon="play">{ps === p.id ? 'Active' : 'Apply'}</Button></td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      ) : <p class="empty-note">No presets yet. Set up a look on Lights, then name it above to save it.</p>}
-    </div>
-  );
-}
 
 // ---------------------------------------------------------------- Scripts
 const DRAFT = 'studio.glow.draft';
@@ -59,25 +14,6 @@ const eventLabel = e => e.type === 'every' ? (e.arg >= 60000 ? `${e.arg / 60000}
   : e.type === 'at' ? `${String(Math.floor(e.arg / 60)).padStart(2, '0')}:${String(e.arg % 60).padStart(2, '0')}`
   : e.type === 'button' ? `#${e.arg}` : '';
 const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 32) || 'script';
-
-// Two-step delete: the first click arms the button ("Delete?"), a second click within 3 s
-// deletes. Deleting a script on the device cannot be undone.
-function DeleteButton({ name, onDelete }) {
-  const [armed, setArmed] = useState(false);
-  const ref = useRef(null);
-  useEffect(() => {
-    if (!armed) return;
-    ref.current?.focus();
-    const t = setTimeout(() => setArmed(false), 3000);
-    return () => clearTimeout(t);
-  }, [armed]);
-  if (!armed) return <IconButton icon="trash" label={`Delete ${name}`} tone="danger" onClick={() => setArmed(true)} />;
-  return (
-    <button type="button" ref={ref} class="btn confirm-del" aria-label={`Confirm: delete ${name}`}
-      onClick={() => { setArmed(false); onDelete(); }} onBlur={() => setArmed(false)}
-      onKeyDown={e => { if (e.key === 'Escape') { e.stopPropagation(); setArmed(false); } }}>Delete?</button>
-  );
-}
 
 export function ScriptsPage() {
   const slots = useStore(d => d.info?.glow?.slots);

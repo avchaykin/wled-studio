@@ -23,6 +23,8 @@ const P = {
   dot: 'M8 8h.01',
   check: 'm3 8.25 3.25 3.25L13 4.75',
   device: 'M2.75 3.75h10.5v7H2.75zM6 13.25h4',
+  pencil: 'M10.5 2.75 13.25 5.5 5.5 13.25H2.75V10.5L10.5 2.75ZM8.75 4.5l2.75 2.75',
+  save: 'M2.75 2.75h8.5l2 2v8.5H2.75zM5.25 2.75v3.5h5v-3.5M5.25 13.25v-4h5.5v4',
 };
 
 export function Icon({ name, size = 16, fill = false, label }) {

@@ -11,7 +11,8 @@ const GUARD_MS = 800;
 
 let data = {
   state: null, info: null, cat: null, online: false,
-  sel: 0, page: 'lights', libTab: 'effects',
+  sel: 0, page: 'lights', libTab: 'presets',
+  presets: null,            // /presets.json, null until loaded
   favs: load('studio.favs', []),
   palette: false,           // command palette open
 };
@@ -166,6 +167,44 @@ export async function upload(path, body, type = 'application/octet-stream') {
   if (!r.ok) throw new Error(`Upload of ${path} failed (HTTP ${r.status})`);
 }
 
+// ---------- presets ----------
+// Presets live in /presets.json; the device answers psave/pdel and writes the file itself.
+export const presetList = p => Object.entries(p ?? {}).filter(([id, x]) => +id > 0 && x && x.n !== undefined)
+  .map(([id, x]) => ({ id: +id, name: x.n || `Preset ${id}`, playlist: !!x.playlist, segs: (x.seg ?? []).filter(s => (s.stop ?? 1) > (s.start ?? 0)).length }))
+  .sort((a, b) => a.name.localeCompare(b.name) || a.id - b.id);
+export function loadPresets() {
+  return getJson('/presets.json').then(p => { set({ presets: p }); return p; }).catch(() => { set({ presets: data.presets ?? {} }); return data.presets; });
+}
+// The device answers first and writes the file a moment later (in its main loop), so poll
+// until the change shows up instead of reloading once.
+async function reloadUntil(done) {
+  for (let i = 0; i < 8; i++) {
+    await new Promise(r => setTimeout(r, 300 + i * 150));
+    const p = await loadPresets();
+    if (p && done(p)) return;
+  }
+}
+export async function savePreset(name, id) {
+  const p = data.presets ?? {};
+  if (id == null) { id = 1; while (p[id] && id < 250) id++; }
+  await postJson('/json/state', { psave: id, n: name, ib: true, sb: true });
+  await reloadUntil(q => q[id]?.n === name);
+}
+export async function deletePreset(id) {
+  await postJson('/json/state', { pdel: id });
+  await reloadUntil(q => !q[id]);
+}
+// renaming keeps the stored look, so it rewrites the file instead of saving the current state
+export async function renamePreset(id, name) {
+  const old = data.presets;
+  if (old?.[id]) set({ presets: { ...old, [id]: { ...old[id], n: name } } }); // show it at once
+  const p = await getJson('/presets.json').catch(e => { set({ presets: old }); throw e; });
+  if (!p[id]) return;
+  p[id].n = name;
+  await upload('/presets.json', JSON.stringify(p), 'application/json');
+  set({ presets: p });
+}
+
 // Effect/palette catalogue, cached per firmware build + script set
 export async function loadCatalogue(info) {
   const key = `studio.cat.${info.vid}.${(info.glow?.slots ?? []).map(s => s.file).join(',')}`;
@@ -187,6 +226,7 @@ export async function boot() {
   connect();
   const { state, info } = await getJson('/json/si');
   set({ state, info, sel: state.mainseg ?? 0 });
+  loadPresets();
   set({ cat: await loadCatalogue(info) });
   let lastScripts = (info.glow?.slots ?? []).map(s => s.file).join(','), loading = false;
   subs.add(async () => {

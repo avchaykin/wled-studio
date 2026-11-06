@@ -139,6 +139,14 @@ h3 { font-size: 11px; font-weight: 600; color: var(--tx2); text-transform: upper
 .tag.danger { color: var(--danger); background: rgb(242 85 90 / .12); }
 .swatchbar { width: 48px; height: 12px; border-radius: 3px; flex: none; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .08); }
 .lib-list.palettes .swatchbar { width: 72px; }
+.preset-save { display: flex; gap: 6px; flex: 1; max-width: 360px; min-width: 200px; }
+.preset-save input { flex: 1; min-width: 0; height: var(--ctl); padding: 0 8px; border: 1px solid var(--line); border-radius: var(--r); background: var(--panel); }
+.preset-save input:focus { border-color: var(--acc); }
+.lib-note { margin-left: auto; font-size: 12px; }
+.lib-list.presets { grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+.lib-actions { display: flex; align-items: center; gap: 2px; padding-right: 2px; opacity: 0; }
+.lib-row:hover .lib-actions, .lib-actions:focus-within { opacity: 1; }
+.lib-rename { flex: 1; min-width: 0; height: 26px; margin: 2px 4px; padding: 0 6px; border: 1px solid var(--acc); border-radius: 4px; background: var(--canvas); }
 
 /* inspector */
 .inspector { min-height: 0; overflow: auto; background: var(--panel); border-left: 1px solid var(--line); }
@@ -328,6 +336,8 @@ input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px rg
   .lib-list { grid-template-columns: 1fr; overflow: visible; }
   .lib-apply { height: 40px; }
   .fav { opacity: 1; width: 40px; height: 40px; }
+  .lib-actions { opacity: 1; }
+  .preset-save { max-width: none; }
   .slider { grid-template-columns: 88px minmax(0, 1fr) 44px; }
   input[type=range] { height: 32px; }
   input[type=range]::-webkit-slider-thumb { width: 18px; height: 18px; margin-top: -7px; }
@@ -374,3 +384,4 @@ input[type=range]:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 3px rg
 .eventlist { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 14px; min-height: 40px; align-items: center; }
 .eventlist li { display: inline-flex; align-items: center; gap: 6px; color: var(--tx2); font-size: 12px; }
 .devscripts h3.spaced { margin-top: 18px; }
+@media (hover: none) { .lib-actions { opacity: 1; } }
