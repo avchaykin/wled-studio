@@ -45,7 +45,7 @@ def main():
         sys.exit(f"release repo clone not found at {RELEASES} (set RELEASES_REPO)")
     # the two files this script regenerates may differ from a previous (dry) run
     generated = ("wled00/studio_version.h",)
-    dirty = [l for l in git_out("status", "--porcelain").splitlines() if not l.startswith("??") and l[3:] not in generated]
+    dirty = [l for l in git_out("status", "--porcelain").splitlines() if not l.startswith("??") and l.split(maxsplit=1)[-1] not in generated]
     if dirty and not a.dry_run:
         sys.exit("source tree has uncommitted changes:\n" + "\n".join(dirty))
     manifest_path = os.path.join(RELEASES, "manifest.json")
